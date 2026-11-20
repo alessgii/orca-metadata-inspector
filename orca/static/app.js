@@ -1,0 +1,594 @@
+"use strict";
+
+const $ = (id) => document.getElementById(id);
+const statusNames = {ok: "Analizado", empty: "Sin descriptivos", unsupported: "No compatible", error: "Error"};
+const pageNames = {workspace: "Inspector", history: "Historial", guide: "Guía de uso"};
+const fields = {
+  author: "Autor o creador", organization: "Organización", username: "Usuario", created: "Creación",
+  modified: "Modificación", software: "Software", version: "Versión", operating_system: "Sistema operativo",
+  make: "Fabricante", model: "Modelo", latitude: "Latitud", longitude: "Longitud", gps: "Coordenadas",
+  title: "Título", subject: "Asunto", comments: "Comentarios", keywords: "Palabras clave",
+  path: "Ruta", identifier: "Identificador", property: "Propiedad",
+};
+const groupNames = {identity: "Identidad", dates: "Fechas", software: "Aplicaciones", device: "Dispositivo",
+  location: "Ubicación", document: "Documento", other: "Otros campos"};
+const cleanupKinds = new Set(["JPEG", "PNG", "PDF", "DOCX", "XLSX", "PPTX"]);
+const numbers = new Intl.NumberFormat("es");
+const order = new Intl.Collator("es", {numeric: true, sensitivity: "base"});
+const state = {
+  files: [], nextId: 0, working: false, engine: false, session: null, sort: "name", ascending: true,
+  inspection: null, historyVersion: 0,
+};
+
+function element(tag, className, ...children) {
+  const result = document.createElement(tag);
+  if (className) result.className = className;
+  result.append(...children);
+  return result;
+}
+
+function button(text, handler, style = "subtle") {
+  const result = element("button", "button " + style, text);
+  result.type = "button";
+  result.addEventListener("click", handler);
+  return result;
+}
+
+function link(text, href, style) {
+  const result = element("a", style, text);
+  result.href = href;
+  return result;
+}
+
+function icon(name) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  const use = document.createElementNS(svg.namespaceURI, "use");
+  svg.classList.add("icon");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  use.setAttribute("href", "/static/icons.svg#" + name);
+  svg.append(use);
+  return svg;
+}
+
+function display(value) {
+  if (value === null || value === undefined || value === "") return "—";
+  return typeof value === "object" ? JSON.stringify(value, null, 2) : String(value);
+}
+
+function formatBytes(bytes) {
+  if (bytes < 1000) return numbers.format(bytes) + " B";
+  return new Intl.NumberFormat("es", {maximumFractionDigits: 1})
+    .format(bytes / (bytes < 1e6 ? 1000 : 1e6)) + (bytes < 1e6 ? " kB" : " MB");
+}
+
+function timestamp(iso) {
+  return new Intl.DateTimeFormat("es", {dateStyle: "medium", timeStyle: "short"}).format(new Date(iso));
+}
+
+function message(id, text, error = false) {
+  const node = $(id);
+  node.textContent = text ?? "";
+  node.hidden = !text;
+  node.dataset.error = String(error);
+}
+
+async function api(path, options) {
+  const response = await fetch(path, {...options, cache: "no-store"});
+  if (!response.ok) {
+    const result = await response.json().catch(() => ({}));
+    throw new Error(typeof result.detail === "string" ? result.detail : "No se pudo completar la operación local.");
+  }
+  return response.status === 204 ? null : response.json();
+}
+
+function sessionPath(id) {
+  return "/api/sessions/" + encodeURIComponent(id);
+}
+
+function filePath(sessionId, fileId) {
+  return sessionPath(sessionId) + "/files/" + encodeURIComponent(fileId);
+}
+
+async function checkEngine() {
+  try {
+    const engine = await api("/api/health");
+    state.engine = engine.available;
+    $("engine").textContent = engine.available ? "ExifTool " + engine.version : "ExifTool no disponible";
+    $("engine-dot").dataset.ready = engine.available ? "yes" : "no";
+    if (!engine.available) message("upload-message", "ExifTool no está disponible. Consulta la instalación en el README.", true);
+  } catch {
+    $("engine").textContent = "Servidor no disponible";
+    $("engine-dot").dataset.ready = "no";
+    message("upload-message", "No se pudo conectar con Orca. Comprueba que el servidor local esté en ejecución.", true);
+  }
+  renderQueue();
+}
+
+function updatePage() {
+  const fromHash = location.hash.slice(1);
+  const current = Object.hasOwn(pageNames, fromHash) ? fromHash : "workspace";
+  for (const key of Object.keys(pageNames)) $("page-" + key).hidden = key !== current;
+  for (const item of document.querySelectorAll("[data-page]")) {
+    if (item.dataset.page === current) item.setAttribute("aria-current", "page");
+    else item.removeAttribute("aria-current");
+  }
+  $("crumb-current").textContent = pageNames[current];
+  if (current === "history") loadHistory();
+}
+
+function addFiles(files) {
+  if (state.working || !files.length) return;
+  if (files.length + state.files.length > 100) {
+    message("upload-message", "Selecciona hasta 100 elementos por carga.", true);
+    return;
+  }
+  state.files.push(...Array.from(files, (file) => ({file, id: ++state.nextId})));
+  message("upload-message");
+  renderQueue();
+}
+
+function renderQueue() {
+  $("queue").hidden = !state.files.length;
+  $("reset").hidden = !state.files.length;
+  $("pick").disabled = state.working;
+  $("reset").disabled = state.working;
+  $("keep").disabled = state.working;
+  $("analyze").disabled = !state.files.length || state.working || !state.engine;
+  const rows = state.files.map(({file, id}) => {
+    const name = element("span", "min-w-0 break-all", file.name);
+    const remove = button(icon("x"), () => {
+      state.files = state.files.filter((item) => item.id !== id);
+      message("upload-message");
+      renderQueue();
+      const next = $("queue").querySelector("button");
+      (next ?? $("pick")).focus();
+    }, "icon-button");
+    remove.disabled = state.working;
+    remove.setAttribute("aria-label", "Quitar " + file.name);
+    return element("li", "flex items-center gap-2 justify-between small",
+      element("div", "flex items-center gap-2 min-w-0", icon("file"), name),
+      element("div", "flex items-center gap-2", element("span", "muted mono whitespace-nowrap", formatBytes(file.size)), remove));
+  });
+  $("queue").replaceChildren(...rows);
+}
+
+function validateSelection() {
+  const files = state.files.map((item) => item.file);
+  if (files.some((file) => file.size > 100_000_000)) {
+    throw new Error("Cada ZIP o archivo individual admite hasta 100 MB (100 000 000 bytes).");
+  }
+  const direct = files.filter((file) => !file.name.toLowerCase().endsWith(".zip"));
+  if (direct.reduce((total, file) => total + file.size, 0) > 100_000_000) {
+    throw new Error("El tamaño acumulado de los archivos individuales supera 100 MB.");
+  }
+}
+
+async function analyze() {
+  if (state.working || !state.files.length) return;
+  try {
+    validateSelection();
+  } catch (error) {
+    message("upload-message", error.message, true);
+    return;
+  }
+  state.working = true;
+  renderQueue();
+  message("upload-message");
+  $("progress-box").hidden = false;
+  $("progress").removeAttribute("value");
+  $("progress-title").textContent = "Cargando y validando archivos";
+  $("progress-count").textContent = "";
+  $("progress-current").textContent = "";
+  try {
+    const form = new FormData();
+    for (const {file} of state.files) form.append("files", file);
+    form.set("keep", $("keep").checked ? "1" : "0");
+    const {id} = await api("/api/sessions", {method: "POST", body: form});
+    let next;
+    let failures = 0;
+    while (true) {
+      try {
+        next = await api(sessionPath(id));
+        failures = 0;
+      } catch (error) {
+        if (++failures >= 3) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 700));
+        continue;
+      }
+      if (next.state === "complete") break;
+      if (next.state === "failed") throw new Error(next.error);
+      $("progress-title").textContent = "Extrayendo metadatos";
+      $("progress-count").textContent = next.processed + " / " + next.total;
+      $("progress").max = next.total;
+      $("progress").value = next.processed;
+      $("progress-current").textContent = next.current ?? "Sesión en espera";
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    }
+    state.files = [];
+    renderResults(next);
+    if (next.notice) message("upload-message", next.notice);
+    if (location.hash === "#history") loadHistory();
+    if (!location.hash || location.hash === "#workspace") {
+      $("results-title").tabIndex = -1;
+      $("results-title").focus();
+    }
+  } catch (error) {
+    message("upload-message", error.message, true);
+  } finally {
+    state.working = false;
+    $("progress-box").hidden = true;
+    renderQueue();
+  }
+}
+
+function renderResults(session) {
+  state.session = session;
+  $("empty-results").hidden = Boolean(session);
+  $("results").hidden = $("result-actions").hidden = !session;
+  if (!session) {
+    $("result-meta").textContent = "Resumen, archivos y coincidencias de un análisis.";
+    return;
+  }
+  const summary = session.summary;
+  $("result-meta").textContent = [
+    timestamp(session.created), (session.duration_ms / 1000).toLocaleString("es") + " s",
+    session.saved ? "Guardado en el historial" : "Sesión temporal",
+  ].join(" / ");
+  $("downloads").replaceChildren(...["json", "csv", "html"].map((kind) =>
+    link(kind.toUpperCase(), sessionPath(session.id) + "/export/" + kind)));
+  const cards = [
+    ["Archivos", summary.count], ["Propiedades", summary.properties], ["Hallazgos", summary.findings],
+    ["Errores", summary.statuses.error],
+  ];
+  $("stats").replaceChildren(...cards.map(([label, value]) => element("div", "panel stat",
+    element("strong", "mono", numbers.format(value)), element("span", "", label))));
+  const breakdown = [
+    ["Formatos", Object.entries(summary.formats).map(([key, value]) => key + " (" + value + ")")],
+    ["Autores (" + summary.authors.length + ")", summary.authors],
+    ["Software (" + summary.software.length + ")", summary.software],
+    ["Estados", Object.entries(summary.statuses).map(([key, value]) => statusNames[key] + " (" + value + ")")],
+  ];
+  $("breakdown").replaceChildren(...breakdown.map(([label, values]) => element("div", "",
+    element("h3", "", label), values.length ? element("ul", "", ...values.map((value) => element("li", "", value)))
+      : element("p", "small muted", "Sin datos detectados"))));
+  $("search").value = "";
+  setOptions("format-filter", "Todos los formatos", Object.keys(summary.formats).map((item) => [item, item]));
+  setOptions("status-filter", "Todos los estados", Object.entries(statusNames));
+  renderTable();
+  $("correlations").replaceChildren(...(summary.correlations.length
+    ? summary.correlations.map((match) => {
+        const names = match.files.map((file) => {
+          const action = button(file.name, () => openDetail(session, file), "subtle");
+          return element("li", "small", action, " ", element("code", "muted", file.source.join(" / ")));
+        });
+        return element("details", "correlation",
+          element("summary", "", fields[match.field] + " · " + display(match.value) + " (" + match.files.length + ")"),
+          element("ul", "", ...names));
+      })
+    : [element("p", "small muted", "No se encontraron campos y valores compartidos.")]));
+}
+
+function setOptions(id, label, options) {
+  $(id).replaceChildren(new Option(label, ""), ...options.map(([value, text]) => new Option(text, value)));
+}
+
+function renderTable() {
+  const session = state.session;
+  if (!session) return;
+  const query = $("search").value.toLocaleLowerCase("es").trim();
+  const format = $("format-filter").value;
+  const status = $("status-filter").value;
+  const relevantDate = (row) => row.created ?? row.modified;
+  const sortValue = (row) => state.sort === "date" ? relevantDate(row) : row[state.sort];
+  const rows = session.files.filter((row) =>
+    (!format || format === (row.format ?? "Sin confirmar")) && (!status || status === row.status) &&
+    (!query || [row.name, row.author, row.software, row.format, ...row.errors].some((value) =>
+      display(value).toLocaleLowerCase("es").includes(query))));
+  rows.sort((first, second) => {
+    const a = sortValue(first) ?? "";
+    const b = sortValue(second) ?? "";
+    const diff = typeof a === "number" && typeof b === "number" ? a - b : order.compare(String(a), String(b));
+    return state.ascending ? diff : -diff;
+  });
+  for (const item of document.querySelectorAll("[data-sort]")) {
+    if (item.dataset.sort === state.sort) item.parentElement.setAttribute("aria-sort", state.ascending ? "ascending" : "descending");
+    else item.parentElement.removeAttribute("aria-sort");
+  }
+  $("match-count").textContent = "(" + rows.length + " de " + session.files.length + ")";
+  const output = rows.map((row) => {
+    const status = element("span", "status", statusNames[row.status]);
+    status.dataset.status = row.status;
+    const action = button("Detalles", () => openDetail(session, row));
+    action.setAttribute("aria-label", "Detalles de " + row.name);
+    return element("tr", "",
+      element("td", "files-name", element("strong", "", row.name)),
+      element("td", "mono", display(row.format)),
+      element("td", "whitespace-nowrap", formatBytes(row.size)),
+      element("td", "table-data", display(row.author)),
+      element("td", "table-data", display(row.software)),
+      element("td", "table-data", display(relevantDate(row))),
+      element("td", "mono", numbers.format(row.field_count)),
+      element("td", "", status), element("td", "", action));
+  });
+  if (!output.length) {
+    const empty = element("td", "muted", "Ningún archivo coincide con los filtros.");
+    empty.colSpan = 9;
+    output.push(element("tr", "", empty));
+  }
+  $("files").replaceChildren(...output);
+}
+
+function infoRows(items) {
+  return element("dl", "", ...items.map(([label, value]) =>
+    element("div", "", element("dt", "", label), element("dd", "", value))));
+}
+
+function structured(normalized) {
+  if (!Object.keys(normalized).length) return element("p", "muted", "Sin campos descriptivos detectados.");
+  return element("div", "grid gap-2", ...Object.entries(groupNames)
+    .filter(([group]) => normalized[group]?.length).map(([group, label]) => {
+      const details = element("details", "", element("summary", "", label + " (" + normalized[group].length + ")"),
+        infoRows(normalized[group].map((item) => [
+          fields[item.field] ?? item.field,
+          element("span", "", element("span", "", display(item.value)), element("br"),
+            element("code", "muted", item.source.join(" / "))),
+        ])));
+      details.open = group === "identity";
+      return details;
+    }));
+}
+
+function technical(raw) {
+  const groups = new Map();
+  for (const [key, value] of Object.entries(raw)) {
+    const pieces = key.split(":");
+    const label = pieces.length > 1 ? pieces.slice(0, -1).join(" / ") : "Otros";
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push([pieces.at(-1), display(value)]);
+  }
+  return groups.size ? element("div", "grid gap-2", ...Array.from(groups, ([name, values]) =>
+    element("details", "", element("summary", "", name + " (" + values.length + ")"), infoRows(values))))
+    : element("p", "muted", "El motor no devolvió propiedades para este archivo.");
+}
+
+function downloadJson(record) {
+  const blob = new Blob([JSON.stringify(record, null, 2)], {type: "application/json"});
+  const url = URL.createObjectURL(blob);
+  const download = link("", url);
+  download.download = "orca-" + record.id + ".json";
+  document.body.append(download);
+  download.click();
+  download.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function jsonView(record) {
+  const status = element("p", "small muted");
+  status.setAttribute("role", "status");
+  const copy = button("Copiar JSON", async () => {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(record, null, 2));
+      status.textContent = "JSON copiado.";
+    } catch {
+      status.textContent = "El navegador bloqueó el portapapeles. Puedes seleccionar el texto o descargarlo.";
+    }
+  });
+  return element("section", "", element("div", "flex gap-2 flex-wrap", copy,
+    button("Descargar JSON", () => downloadJson(record))), status, element("pre", "", JSON.stringify(record, null, 2)));
+}
+
+function findingsView(items) {
+  if (!items.length) return element("p", "muted", "Sin hallazgos potencialmente sensibles.");
+  return element("ul", "", ...items.map((item) => element("li", "finding",
+    element("strong", "", (fields[item.field] ?? item.field) + " · " + display(item.value)),
+    element("p", "muted small", item.description),
+    element("code", "small", item.source.join(" / ")))));
+}
+
+function diffTable(rows) {
+  const body = rows.map((row) => element("tr", "", element("td", "",
+    element("code", "", row.source), row.technical ? element("div", "small muted", "Técnico o estructural") : ""),
+  element("td", "before", display(row.before)), element("td", "after", display(row.after))));
+  return element("div", "scroll-table", element("table", "diff-table",
+    element("thead", "", element("tr", "", ...["Campo", "Antes", "Después"].map((name) => {
+      const th = element("th", "", name);
+      th.scope = "col";
+      return th;
+    }))), element("tbody", "", ...body)));
+}
+
+function cleanupView(view) {
+  const box = element("section", "", element("h3", "", "Limpieza de metadatos"));
+  if (!view.session.temporary || !cleanupKinds.has(view.record.format) || !["ok", "empty"].includes(view.record.status)) {
+    box.append(element("p", "muted", view.session.temporary
+      ? "Este archivo está disponible para inspección. Su formato o estado no admite limpieza verificada."
+      : "La sesión viene del historial. Vuelve a cargar el archivo para crear una copia."));
+    return box;
+  }
+  box.append(element("p", "muted", "Crea una copia, verifica su validez y compara los metadatos detectados."));
+  if (!view.cleaned) {
+    const action = button(view.cleaning ? "Verificando copia…" : "Crear copia saneada", () => cleanFile(view), "primary");
+    action.disabled = view.cleaning;
+    box.append(action);
+  }
+  if (view.error) {
+    const warning = element("p", "notice", view.error);
+    warning.dataset.error = "true";
+    warning.setAttribute("role", "alert");
+    box.append(warning);
+  }
+  if (view.cleaned) {
+    const {after, comparison, policy, limits} = view.cleaned;
+    box.append(element("p", "", policy), element("p", "muted small", limits),
+      link("Descargar copia saneada", filePath(view.session.id, view.record.id) + "/copy", "button primary"),
+      element("p", "small", "SHA-256 de la copia"),
+      element("code", "", after.sha256));
+    for (const [key, name] of Object.entries({removed: "Eliminados", changed: "Modificados",
+      retained: "Persistentes", added: "Añadidos"})) {
+      const rows = comparison[key];
+      const details = element("details", "", element("summary", "", name + " (" + rows.length + ")"),
+        rows.length ? diffTable(rows) : element("p", "muted small", "Sin campos."));
+      details.open = key === "removed" && Boolean(rows.length);
+      box.append(details);
+    }
+  }
+  return box;
+}
+
+async function cleanFile(view) {
+  view.cleaning = true;
+  view.error = "";
+  renderDetail(view, "clean");
+  try {
+    view.cleaned = await api(filePath(view.session.id, view.record.id) + "/clean", {method: "POST"});
+  } catch (error) {
+    view.error = error.message;
+  } finally {
+    view.cleaning = false;
+    if (state.inspection === view && view.tab === "clean") renderDetail(view, "clean");
+  }
+}
+
+function renderDetail(view, tab = "normalized") {
+  view.tab = tab;
+  const record = view.record;
+  const choices = {
+    normalized: ["Normalizados", () => structured(record.normalized)],
+    technical: ["Técnicos", () => technical(record.raw)],
+    findings: ["Hallazgos (" + record.findings.length + ")", () => findingsView(record.findings)],
+    json: ["JSON", () => jsonView(record)], clean: ["Antes / Después", () => cleanupView(view)],
+  };
+  const navigation = element("nav", "detail-nav");
+  navigation.setAttribute("aria-label", "Vistas del archivo");
+  for (const [key, [text]] of Object.entries(choices)) {
+    const item = button(text, () => {
+      renderDetail(view, key);
+      $("detail-body").querySelector("[aria-pressed=true]").focus();
+    });
+    item.setAttribute("aria-pressed", String(key === tab));
+    navigation.append(item);
+  }
+  const general = infoRows([
+    ["Formato", display(record.format)], ["Tamaño", formatBytes(record.size) + " (" + numbers.format(record.size) + " B)"],
+    ["SHA-256", element("code", "", display(record.sha256))], ["Estado", statusNames[record.status]],
+  ]);
+  const notices = [...record.errors, ...record.warnings].map((text) => element("li", "", text));
+  $("detail-body").replaceChildren(general,
+    ...(notices.length ? [element("ul", "notice", ...notices)] : []), navigation, choices[tab][1]());
+}
+
+async function openDetail(session, row) {
+  const view = {session, record: null, cleaned: null, cleaning: false, error: ""};
+  state.inspection = view;
+  $("detail-title").textContent = row.name;
+  $("detail-kind").textContent = "Inspector individual";
+  $("detail-body").replaceChildren(element("p", "muted", "Cargando metadatos…"));
+  if (!$("detail").open) $("detail").showModal();
+  try {
+    view.record = await api(filePath(session.id, row.id));
+    if (state.inspection === view) renderDetail(view);
+  } catch (error) {
+    if (state.inspection === view) $("detail-body").replaceChildren(element("p", "notice", error.message));
+  }
+}
+
+function confirmDelete(text) {
+  const dialog = $("confirm");
+  dialog.returnValue = "cancel";
+  $("confirm-text").textContent = text;
+  dialog.showModal();
+  return new Promise((resolve) => dialog.addEventListener("close", () => resolve(dialog.returnValue === "delete"), {once: true}));
+}
+
+async function removeSession(id, fromHistory = false) {
+  if (!await confirmDelete("Se eliminarán los resultados guardados y los archivos temporales de esta sesión.")) return;
+  try {
+    await api(sessionPath(id), {method: "DELETE"});
+    if (state.session?.id === id) renderResults(null);
+    if (fromHistory) loadHistory();
+  } catch (error) {
+    message(fromHistory ? "history-message" : "upload-message", error.message, true);
+  }
+}
+
+async function loadHistory() {
+  const version = ++state.historyVersion;
+  message("history-message", "Cargando historial…");
+  try {
+    const entries = await api("/api/history");
+    if (version !== state.historyVersion) return;
+    message("history-message");
+    $("clear-history").disabled = entries.length === 0;
+    $("history-list").replaceChildren(...(entries.length ? entries.map((entry) => {
+      const open = button("Abrir sesión", async () => {
+        try {
+          renderResults(await api(sessionPath(entry.id)));
+          location.hash = "workspace";
+        } catch (error) {
+          message("history-message", error.message, true);
+        }
+      });
+      const remove = button("Eliminar", () => removeSession(entry.id, true));
+      return element("div", "history-row flex items-center justify-between flex-wrap gap-2",
+        element("div", "", element("strong", "", timestamp(entry.created)),
+          element("p", "muted", entry.count + " archivos / " + entry.findings + " hallazgos")),
+        element("div", "flex gap-2", open, remove));
+    }) : [element("p", "muted", "Todavía no hay sesiones guardadas.")]));
+  } catch (error) {
+    if (version === state.historyVersion) message("history-message", error.message, true);
+  }
+}
+
+$("clear-history").addEventListener("click", async () => {
+  if (!await confirmDelete("Se eliminarán todos los resultados guardados en SQLite. Las sesiones temporales siguen su plazo de retención.")) return;
+  try {
+    await api("/api/history", {method: "DELETE"});
+    if (state.session?.saved) {
+      if (state.session.temporary) renderResults({...state.session, saved: false});
+      else renderResults(null);
+    }
+    loadHistory();
+  } catch (error) {
+    message("history-message", error.message, true);
+  }
+});
+
+$("pick").addEventListener("click", () => $("picker").click());
+$("picker").addEventListener("change", () => {
+  addFiles($("picker").files);
+  $("picker").value = "";
+});
+$("reset").addEventListener("click", () => {
+  state.files = [];
+  message("upload-message");
+  renderQueue();
+  $("pick").focus();
+});
+$("analyze").addEventListener("click", analyze);
+$("close-session").addEventListener("click", () => removeSession(state.session.id));
+$("detail").addEventListener("close", () => { state.inspection = null; });
+$("search").addEventListener("input", renderTable);
+for (const id of ["format-filter", "status-filter"]) $(id).addEventListener("change", renderTable);
+for (const sort of document.querySelectorAll("[data-sort]")) sort.addEventListener("click", () => {
+  state.ascending = state.sort === sort.dataset.sort ? !state.ascending : true;
+  state.sort = sort.dataset.sort;
+  renderTable();
+});
+for (const eventName of ["dragenter", "dragover", "dragleave", "drop"]) {
+  $("drop").addEventListener(eventName, (event) => {
+    if (!event.dataTransfer.types.includes("Files")) return;
+    event.preventDefault();
+    if (state.working) return;
+    const leaving = eventName === "dragleave" && !$("drop").contains(event.relatedTarget);
+    if (eventName === "drop" || leaving) $("drop").classList.remove("dragging");
+    else $("drop").classList.add("dragging");
+    if (eventName === "drop") addFiles(event.dataTransfer.files);
+  });
+}
+for (const eventName of ["dragover", "drop"]) window.addEventListener(eventName, (event) => {
+  if (event.dataTransfer.types.includes("Files")) event.preventDefault();
+});
+window.addEventListener("hashchange", updatePage);
+updatePage();
+checkEngine();

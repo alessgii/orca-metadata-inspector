@@ -1,0 +1,12 @@
+.venv/
+.tools/
+.orca-data/
+node_modules/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+.coverage
+.env
+dist/
+build/
+*.egg-info/

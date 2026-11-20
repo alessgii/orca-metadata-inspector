@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'"><title>Informe de metadatos | Orca</title></head>
+<body>
+<main>
+<h1>Informe de metadatos</h1>
+<dl>
+<dt>Sesión</dt><dd>{{ report.id }}</dd><dt>Fecha</dt><dd>{{ report.created }}</dd>
+<dt>Duración (ms)</dt><dd>{{ report.duration_ms }}</dd>
+<dt>Motor</dt><dd>{{ report.engine.name }} {{ report.engine.version }} <code>{{ report.engine.options }}</code></dd>
+<dt>Archivos</dt><dd>{{ report.summary.count }}</dd>
+<dt>Propiedades</dt><dd>{{ report.summary.properties }}</dd><dt>Hallazgos</dt><dd>{{ report.summary.findings }}</dd>
+</dl>
+{% for file in report.files %}
+<article>
+<h2>{{ file.name }}</h2>
+<p>{{ file.format or 'Sin confirmar' }} | {{ file.size }} bytes | Estado {{ {'ok':'analizado','empty':'sin propiedades descriptivas','unsupported':'no compatible','error':'error'}[file.status] }}</p>
+<p>SHA-256 <code>{{ file.sha256 }}</code></p>
+{% if file.errors or file.warnings %}
+<h3>Errores y avisos</h3><ul>{% for message in file.errors + file.warnings %}<li>{{ message }}</li>{% endfor %}</ul>
+{% endif %}
+{% if file.normalized %}
+<h3>Propiedades normalizadas</h3>
+<table><thead><tr><th scope="col">Campo</th><th scope="col">Valor</th><th scope="col">Origen</th></tr></thead><tbody>
+{% for group in file.normalized.values() %}{% for item in group %}
+<tr><td>{{ item.field }}</td><td>{{ item.value }}</td><td><code>{{ item.source|join(' / ') }}</code></td></tr>
+{% endfor %}{% endfor %}</tbody></table>
+{% endif %}
+{% if file.findings %}
+<h3>Información potencialmente sensible</h3><ul>
+{% for item in file.findings %}<li><strong>{{ item.field }}</strong> {{ item.value }}. {{ item.description }}</li>{% endfor %}</ul>
+{% endif %}
+</article>
+{% endfor %}
+{% if report.summary.correlations %}
+<h2>Coincidencias entre archivos</h2><ul>
+{% for item in report.summary.correlations %}<li>{{ item.field }} — {{ item.value }}{% if item.files %}<ul>
+{% for file in item.files %}<li>{{ file.name }} <code>{{ file.source|join(' / ') }}</code></li>{% endfor %}
+</ul>{% endif %}</li>{% endfor %}</ul>
+{% endif %}
+</main>
+</body></html>

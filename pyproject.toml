@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools==82.0.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orca-metadata-inspector"
+version = "1.0.0"
+description = "Inspector local de metadatos de archivos."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "anyio==4.16.0",
+  "defusedxml==0.7.1",
+  "fastapi==0.165.0",
+  "jinja2==3.1.6",
+  "lxml==6.1.3",
+  "pikepdf==10.18.2",
+  "pillow==13.0.0",
+  "pydantic==2.14.4",
+  "python-multipart==0.0.34",
+  "starlette==1.10.0",
+  "uvicorn==0.54.0",
+]
+
+[project.optional-dependencies]
+test = ["httpx2==2.16.2", "openpyxl==3.1.5", "pytest==9.2.0", "python-docx==1.2.0", "python-pptx==1.0.2"]
+
+[tool.setuptools]
+packages = ["orca"]
+
+[tool.setuptools.package-data]
+orca = ["static/*", "templates/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

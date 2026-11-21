@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'">
+  <title>Duelo de documentos | Orca</title>
+</head>
+<body>
+<main>
+  <h1>Duelo de documentos</h1>
+  <dl>
+    {% for label, file in [('Archivo A', result.a), ('Archivo B', result.b)] %}
+    <dt>{{ label }}</dt><dd>{{ file.name }} ({{ file.format or 'Formato sin confirmar' }}, {{ file.size }} bytes)</dd>
+    <dt>SHA-256</dt><dd><code>{{ file.sha256 or 'Sin confirmar' }}</code></dd>
+    {% endfor %}
+  </dl>
+  {% set statuses = {'matching':'Coincidente','different':'Diferente','only_a':'Solo en A','only_b':'Solo en B','not_comparable':'No comparable'} %}
+  <h2>Resumen</h2>
+  <ul>
+    {% for key, count in result.summary.items() %}<li>{{ statuses[key] }} ({{ count }})</li>{% endfor %}
+    {% for note in result.notes %}<li>{{ note }}</li>{% endfor %}
+  </ul>
+  <table>
+    <thead><tr><th scope="col">Propiedad</th><th scope="col">Archivo A</th><th scope="col">Archivo B</th></tr></thead>
+    <tbody>
+    {% for row in result.rows %}
+    <tr>
+      <th scope="row">{{ row.label }}<br>{{ statuses[row.status] }}{% if row.explanation %}<br>{{ row.explanation }}{% endif %}</th>
+      {% for side in [row.a, row.b] %}
+      <td>
+        {% for item in side %}
+        {% if item.source %}<code>{{ item.source|join(' / ') }}</code>{% endif %}
+        <pre>{{ item.original|tojson }}</pre>
+        {% if 'interpreted' in item %}<p>Valor interpretado</p><pre>{{ item.interpreted|tojson }}</pre>{% endif %}
+        {% if item.interpretation_source %}<p>Fuente de hemisferio <code>{{ item.interpretation_source|join(' / ') }}</code></p>{% endif %}
+        {% for date in item.dates or [] %}{% if date.utc %}<p>UTC {{ date.utc }}</p>{% endif %}{% endfor %}
+        {% else %}Ausente{% endfor %}
+      </td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</main>
+</body>
+</html>

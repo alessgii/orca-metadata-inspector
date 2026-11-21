@@ -214,6 +214,12 @@ class Sessions:
                     job.expires = time.monotonic() + self.settings.ttl
             self.operation.release()
 
+    def cached_cleanup(self, session_id, file_id):
+        with self.guard:
+            job = self.active.get(session_id)
+            copy = job.copies.get(file_id) if job and job.expires > time.monotonic() else None
+            return copy[1] if copy else None
+
     def open_copy(self, session_id, file_id):
         with self.guard:
             self.reap()

@@ -157,3 +157,58 @@ def compare(before, after):
         result[kind].append({"source": source, "before": before.get(source), "after": after.get(source),
                              "technical": technical(source)})
     return result
+
+
+SEMANTIC_LABELS = {
+    "author": "Autor declarado", "creator": "Creador declarado", "last_editor": "Último editor registrado",
+    "organization": "Organización", "username": "Nombre de usuario", "software": "Software",
+    "creation_tool": "Herramienta de creación", "producer": "Productor", "version": "Versión del software",
+    "operating_system": "Sistema operativo", "computer": "Nombre de equipo",
+    "make": "Fabricante", "model": "Modelo de dispositivo", "latitude": "Latitud", "longitude": "Longitud",
+    "gps": "Coordenadas GPS", "place": "Ubicación declarada", "path": "Ruta",
+    "identifier": "Identificador", "document_id": "Identificador documental", "serial": "Número de serie",
+    "comments": "Comentario o descripción", "title": "Título", "subject": "Asunto", "keywords": "Palabras clave",
+}
+ROLE_TAGS = {
+    "creator": "creator creators originator",
+    "last_editor": "lastmodifiedby lastauthor lasteditor",
+    "producer": "producer pdfproducer",
+    "creation_tool": "creatortool creatorsw originatingprogram",
+    "computer": "computername hostname machinename",
+    "place": "city country countryname province state stateprovince sublocation locationname location",
+    "document_id": "documentid instanceid originaldocumentid imageuniqueid uuid",
+    "serial": "serialnumber internalserialnumber lensserialnumber bodyserialnumber",
+}
+ROLES = {tag: field for field, tags in ROLE_TAGS.items() for tag in tags.split()}
+
+
+def semantic_field(source, fallback="property"):
+    for key in reversed(source):
+        if not isinstance(key, str):
+            continue
+        tag = tag_name(key)
+        if tag == "creator" and key.startswith("PDF:"):
+            return "creation_tool"
+        if tag in ROLES:
+            return ROLES[tag]
+        if tag in LOOKUP:
+            return LOOKUP[tag][1]
+    return fallback
+
+
+def interpreted_field(item):
+    """Use the source to disambiguate existing normalized author/software aliases."""
+    field = item["field"]
+    return semantic_field(item["source"], field) if field in {"author", "software", "identifier", "property"} else field
+
+
+def raw_value(raw, source):
+    value = raw
+    for segment in source:
+        if isinstance(value, dict) and isinstance(segment, str):
+            value = value[segment]
+        elif isinstance(value, list) and isinstance(segment, int) and 0 <= segment < len(value):
+            value = value[segment]
+        else:
+            raise KeyError("The source does not match the stored metadata.")
+    return value

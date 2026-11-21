@@ -2,6 +2,7 @@ import shutil
 import sys
 
 from .analysis import inspect_file
+from .exposure import analyze_exposure, exposure_difference
 from .extraction import EngineError, run_command
 from .metadata import compare
 from .uploads import Input
@@ -37,4 +38,5 @@ def clean(source, target, record, extractor, settings):
     if after["status"] not in {"ok", "empty"}:
         raise EngineError("La copia no superó la extracción de verificación.")
     return {"after": after, "comparison": compare(record["raw"], after["raw"]), "policy": POLICIES[kind],
+            "exposure_comparison": exposure_difference(analyze_exposure(record), analyze_exposure(after)),
             "limits": "La comparación abarca los campos que ExifTool leyó. Pueden persistir datos en el contenido, en partes incrustadas o en campos que el extractor no reconoce."}

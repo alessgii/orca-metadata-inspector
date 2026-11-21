@@ -6,9 +6,10 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager, suppress
 from urllib.parse import quote
 from uuid import uuid4
+from typing import Annotated, Literal
 
 from anyio import to_thread
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Path, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel
 from starlette.background import BackgroundTask
@@ -19,14 +20,23 @@ from starlette.templating import Jinja2Templates
 
 from .cleanup import POLICIES
 from .config import CHUNK, MAX_BYTES, MAX_FILES, ROOT, Settings
+from .duel import compare_files
+from .evidence import format_evidence
+from .exposure import analyze_exposure
 from .extraction import ExifTool
+from .metadata import properties
 from .reports import as_csv, payload
 from .sessions import Sessions
+from .timeline import build_timeline
 from .uploads import FORMATS, UploadError, prepare, safe_upload_name
 
 ASSETS = ROOT / "orca"
 TEMPLATES = Jinja2Templates(directory=ASSETS / "templates")
 TEMPLATES.env.policies["json.dumps_kwargs"] = {"sort_keys": False}
+
+
+StoredId = Annotated[str, Path(pattern=r"^[a-f0-9]{32}$")]
+CompareId = Annotated[str, Query(pattern=r"^[a-f0-9]{32}$")]
 
 
 class EngineInfo(BaseModel):
@@ -193,6 +203,58 @@ def create_app(settings: Settings | None = None, extractor=None):
     def detail(request: Request, session_id: str, file_id: str):
         record, = request.app.state.service.records(session_id, file_id)
         return record
+
+    @app.get("/api/sessions/{session_id}/files/{file_id}/context")
+    def inspection_context(request: Request, session_id: StoredId, file_id: StoredId):
+        service = request.app.state.service
+        with service.guard:
+            record, = service.records(session_id, file_id)
+            cleaned = service.cached_cleanup(session_id, file_id)
+        timeline = build_timeline(record["raw"])
+        return {"timeline": timeline, "exposure": analyze_exposure(record, timeline),
+                "exposure_comparison": cleaned["exposure_comparison"] if cleaned else None}
+
+    @app.get("/api/sessions/{session_id}/files/{file_id}/evidence")
+    def evidence(request: Request, session_id: StoredId, file_id: StoredId,
+                 kind: Literal["raw", "normalized", "finding", "exposure"] = "raw",
+                 tag: Annotated[str | None, Query(max_length=1024)] = None,
+                 index: Annotated[int, Query(ge=0)] = 0):
+        service = request.app.state.service
+        with service.guard:
+            record, = service.records(session_id, file_id)
+            session = service.status(session_id, include_files=False)
+        if kind == "raw":
+            if tag is None or tag not in record["raw"]:
+                raise HTTPException(404, "El campo indicado no existe en el archivo.")
+            return format_evidence(record, session, [tag])
+        if kind == "normalized":
+            items = list(properties(record["normalized"]))
+        elif kind == "finding":
+            items = record["findings"]
+        else:
+            items = [item for category in analyze_exposure(record)["categories"] for item in category["items"]]
+        try:
+            item = items[index]
+            return format_evidence(record, session, item["source"], item, kind)
+        except (IndexError, KeyError) as exc:
+            raise HTTPException(404, "La evidencia indicada no existe en este archivo.") from exc
+
+    @app.get("/api/sessions/{session_id}/duel")
+    def duel(request: Request, session_id: StoredId, file_a: CompareId, file_b: CompareId,
+             download: bool = False, format: Literal["json", "html"] = "json"):
+        if file_a == file_b:
+            raise HTTPException(422, "Selecciona dos archivos distintos.")
+        service = request.app.state.service
+        with service.guard:
+            first, = service.records(session_id, file_a)
+            second, = service.records(session_id, file_b)
+        result = {"schema_version": 1, "session_id": session_id, **compare_files(first, second)}
+        if download:
+            headers = {"Content-Disposition": attachment(f"orca-duelo.{format}")}
+            if format == "html":
+                return TEMPLATES.TemplateResponse(request, "duel_report.html", {"result": result}, headers=headers)
+            return JSONResponse(result, headers=headers)
+        return result
 
     @app.get("/api/history")
     def history(request: Request):

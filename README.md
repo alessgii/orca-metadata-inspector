@@ -100,6 +100,17 @@ En **Laboratorio de hashes** dispones de tres herramientas:
 
 En **Manifiestos** puedes seleccionar varios archivos o una carpeta para generar un manifiesto JSON (esquema v1) con rutas relativas normalizadas, tamaños y hashes. Al importar un manifiesto y volver a seleccionar los archivos, Orca clasifica cada elemento como **sin cambios**, **modificado**, **faltante**, **adicional** o **no analizable**, y permite exportar el resultado en JSON o HTML. Un manifiesto JSON verifica integridad respecto a esa referencia, pero no autenticidad criptográfica al no incorporar firma digital.
 
+### Investigaciones (expedientes portables)
+
+En **Investigaciones** puedes crear expedientes independientes persistidos en SQLite local (con migraciones versionadas) e identificados mediante **UUID v7** criptográficamente seguros e inmutables (sin numeración secuencial global). Cada expediente integra:
+
+- **Gestión de estados y auditoría:** estados `Abierta`, `Pausada` y `Cerrada` con transiciones validadas, cierre con resumen y conclusión obligatorios, reapertura con motivo explícito y línea de tiempo de actividades de solo anexado.
+- **Incorporación y análisis automático:** registra uno o varios archivos o una carpeta, ejecuta ExifTool y el extractor estructural (PPTX), detecta duplicados por SHA-256 conservando registros independientes y **no guarda copias permanentes de los archivos originales**.
+- **Comparación múltiple y Matriz de similitud:** compara cualquier pareja de archivos registrados reutilizando la estructura persistida, diferencia identidad binaria de similitud documental y permite cálculo bajo demanda o en lotes acotados.
+- **Línea de tiempo documental y Mapa de relaciones:** ordena documentos por incorporación, fechas internas declaradas o orden manual; visualiza un grafo interactivo de conexiones automáticas (hashes, recursos, similitud) y manuales (confirmadas o hipótesis).
+- **Observaciones versionadas e informes:** notas humanas vinculables a la investigación, archivos, comparaciones, eventos o relaciones, con historial de versiones y exportación en HTML y JSON preparado para futuras integraciones locales de IA.
+- **Portabilidad e importación masiva:** exporta expedientes como paquetes `.zip` versionados con manifiesto de integridad interno (sin archivos originales) e importa uno o múltiples paquetes (escenario profesor/estudiantes) con previsualización, detección de duplicados y conflictos por UUID, y creación de copias independientes conservando todas las relaciones internas.
+
 ### Copiar como evidencia
 
 En **Normalizados**, **Técnicos**, **Hallazgos** o **Exposición**, abre **Evidencia** junto al dato. Puedes copiar el valor original, un bloque Markdown o JSON con el archivo, SHA-256 si existe, fecha de análisis, versión de ExifTool, etiqueta exacta y ruta dentro del JSON de extracción. La evidencia contextual incluye el valor interpretado cuando difiere del original y la explicación del hallazgo cuando corresponde.
@@ -192,6 +203,7 @@ Orca lee variables del entorno del proceso. Usa `export ORCA_TTL=900` en Linux o
 | `orca/timeline.py`, `orca/duel.py` | Interpretación de fechas y comparación en tres dimensiones (binaria, contenido y metadatos). |
 | `orca/content.py`, `orca/similarity.py` | Motor extensible de extracción/comparación profunda (PPTX) y puntuación determinista de similitud. |
 | `orca/hashes.py`, `orca/manifests.py` | Cálculo de hashes en bloques, validación/comparación, esquema v1 y verificación de manifiestos. |
+| `orca/investigations.py`, `orca/portability.py` | Expedientes con UUIDv7, matriz de similitud, cronologías, grafo, notas versionadas y paquetes `.zip` portables. |
 | `orca/evidence.py`, `orca/exposure.py` | Evidencia contextual, reglas de exposición y diferencias tras limpiar. |
 | `orca/sessions.py`, `orca/storage.py` | Lotes, progreso, temporales y persistencia SQLite (`analysis`, `document` y `hash_record`). |
 | `orca/cleanup.py`, `orca/rewrite.py` | Políticas por formato, reescritura, reextracción y validación de copias. |
@@ -225,6 +237,14 @@ SQLite se usa mediante la biblioteca estándar para mantener la instalación lig
 | `POST /api/manifests/generate` | Genera y valida un manifiesto de integridad JSON v1 (acepta JSON precalculado o multipart). |
 | `POST /api/manifests/verify` | Verifica archivos contra un manifiesto JSON v1 y clasifica cambios, ausencias y adicionales. |
 | `POST /api/manifests/report` | Exporta el resultado de verificación de un manifiesto como informe HTML seguro. |
+| `GET /api/investigations`, `POST /api/investigations` | Lista (con búsqueda por nombre/responsable/UUID, estado y orden) o crea expedientes. |
+| `GET /api/investigations/{uuid}`, `PATCH`, `DELETE`, `POST .../state` | Consulta, edita, elimina o cambia el estado (`pause`, `resume`, `close`, `reopen`) de un expediente. |
+| `GET/POST /api/investigations/{uuid}/files`, `.../order`, `.../verify-hash` | Incorpora/analiza archivos, gestiona orden manual y re-verifica integridad SHA-256. |
+| `GET/POST /api/investigations/{uuid}/comparisons`, `.../matrix`, `.../matrix/compute` | Ejecuta/consulta comparaciones persistentes y calcula la matriz de similitud bajo demanda o en lotes. |
+| `GET /api/investigations/{uuid}/timeline/{activity\|documents}`, `.../graph`, `.../relations` | Auditoría de solo anexado, línea de tiempo documental, grafo y relaciones manuales. |
+| `GET/POST /api/investigations/{uuid}/notes`, `PATCH .../notes/{note_uuid}` | Observaciones humanas con historial de versiones. |
+| `GET /api/investigations/{uuid}/export`, `.../report/{json\|html}`, `POST .../manifest` | Exporta paquete portable `.zip`, informes completos y manifiestos SHA-256. |
+| `POST /api/investigations/import/preview`, `POST /api/investigations/import` | Previsualiza conflictos e importa individualmente o por lotes paquetes de investigación `.zip`. |
 
 ## Desarrollo y pruebas
 

@@ -33,6 +33,16 @@ class History:
                     payload TEXT NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS document_analysis ON document(analysis_id, position);
+                CREATE TABLE IF NOT EXISTS hash_record (
+                    id TEXT PRIMARY KEY,
+                    created TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    size INTEGER NOT NULL,
+                    algorithm TEXT NOT NULL,
+                    hash TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS hash_record_created ON hash_record(created DESC);
+                CREATE INDEX IF NOT EXISTS hash_record_algorithm ON hash_record(algorithm);
             """)
 
     def save(self, session, files):
@@ -69,3 +79,51 @@ class History:
                 db.execute("DELETE FROM analysis WHERE id = ?", (session_id,))
             else:
                 db.execute("DELETE FROM analysis")
+
+    def save_hash(self, record: dict) -> dict:
+        with self.connection() as db:
+            db.execute(
+                "INSERT INTO hash_record (id, created, name, size, algorithm, hash) VALUES (?, ?, ?, ?, ?, ?)",
+                (record["id"], record["created"], record["name"], record["size"],
+                 record["algorithm"], record["hash"]),
+            )
+        return record
+
+    def list_hashes(self, query: str | None = None, algorithm: str | None = None) -> list[dict]:
+        clauses = []
+        params = []
+        if algorithm:
+            clauses.append("algorithm = ?")
+            params.append(algorithm)
+        if query:
+            clauses.append("LOWER(name) LIKE ? ESCAPE '\\'")
+            escaped = query.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            params.append(f"%{escaped}%")
+        where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+        sql = f"SELECT id, created, name, size, algorithm, hash FROM hash_record{where} ORDER BY created DESC, rowid DESC"
+        with self.connection() as db:
+            rows = db.execute(sql, params).fetchall()
+        return [
+            {"id": row[0], "created": row[1], "name": row[2], "size": row[3],
+             "algorithm": row[4], "hash": row[5]}
+            for row in rows
+        ]
+
+    def get_hash(self, record_id: str) -> dict | None:
+        with self.connection() as db:
+            row = db.execute(
+                "SELECT id, created, name, size, algorithm, hash FROM hash_record WHERE id = ?",
+                (record_id,),
+            ).fetchone()
+        if not row:
+            return None
+        return {"id": row[0], "created": row[1], "name": row[2], "size": row[3],
+                "algorithm": row[4], "hash": row[5]}
+
+    def delete_hash(self, record_id: str | None = None) -> bool:
+        with self.connection() as db:
+            if record_id:
+                cursor = db.execute("DELETE FROM hash_record WHERE id = ?", (record_id,))
+                return cursor.rowcount > 0
+            db.execute("DELETE FROM hash_record")
+            return True

@@ -1,6 +1,32 @@
 {% macro icon(name, class_name='icon') -%}
 <svg class="{{ class_name }}" aria-hidden="true" focusable="false"><use href="/static/icons.svg#{{ name }}"></use></svg>
 {%- endmacro %}
+{% set btn_base = "inline-flex items-center justify-center gap-[7px] min-h-[36px] px-3 py-[7px] border border-transparent rounded-md font-semibold text-[0.86rem] leading-[1.25] text-center whitespace-nowrap shrink-0 break-normal no-underline [&_svg]:size-4 disabled:text-muted disabled:bg-wash disabled:border-line disabled:opacity-78" %}
+{% set btn_primary = btn_base ~ " primary text-on-accent bg-accent border-accent hover:not-disabled:bg-accent-hover hover:not-disabled:border-accent-hover" %}
+{% set btn_accent = btn_base ~ " text-accent border-tint-line bg-tint hover:not-disabled:border-accent" %}
+{% set btn_subtle = btn_base ~ " text-ink bg-surface border-line hover:not-disabled:bg-wash hover:not-disabled:border-line-strong" %}
+{% set btn_quiet = btn_base ~ " text-muted bg-transparent hover:not-disabled:bg-wash hover:not-disabled:border-line-strong" %}
+{% set btn_danger = btn_base ~ " text-on-danger bg-danger border-danger hover:not-disabled:bg-danger-hover" %}
+{% set btn_icon = btn_base ~ " text-ink bg-surface border-line hover:not-disabled:bg-wash hover:not-disabled:border-line-strong p-[7px] min-w-[35px] min-h-[35px] flex-none" %}
+{% set btn_quiet_sm = btn_quiet ~ " min-h-[30px] px-[9px] py-1 text-[0.8rem]" %}
+{% set sidebar_tool = "flex items-center justify-start gap-3 w-full min-h-[40px] px-3 border border-transparent rounded-[7px] bg-transparent text-muted text-[0.88rem] font-semibold text-left whitespace-nowrap overflow-hidden no-underline hover:bg-wash hover:text-ink aria-[current=page]:text-accent aria-[current=page]:bg-tint aria-[current=page]:border-tint-line aria-[pressed=true]:text-accent aria-[pressed=true]:bg-tint aria-[pressed=true]:border-tint-line" %}
+{% set sidebar_label = "opacity-0 invisible pointer-events-none whitespace-nowrap transition-[opacity,visibility] duration-150 ease-out group-hover/sidebar:opacity-100 group-hover/sidebar:visible group-hover/sidebar:pointer-events-auto group-hover/sidebar:delay-[40ms] group-focus-within/sidebar:opacity-100 group-focus-within/sidebar:visible group-focus-within/sidebar:pointer-events-auto group-has-[[data-pinned=true]]/sidebar:opacity-100 group-has-[[data-pinned=true]]/sidebar:visible group-has-[[data-pinned=true]]/sidebar:pointer-events-auto" %}
+{% set panel_cls = "border border-line rounded-[10px] bg-surface min-w-0" %}
+{% set lab_panel = panel_cls ~ " p-[18px_20px] max-[540px]:p-[13px] grid grid-cols-[minmax(0,1fr)] gap-3.5" %}
+{% set notice_cls = "px-[13px] py-2.5 border border-warning-line rounded-[7px] bg-warning-bg text-warning break-words text-[0.88rem] leading-[1.45] data-[error=true]:text-error data-[error=true]:bg-error-bg data-[error=true]:border-error-line" %}
+{% set select_cls = "min-h-[36px] px-[9px] py-[5px] border border-line-strong rounded-md bg-surface text-ink text-[0.86rem] max-w-full" %}
+{% set input_cls = "min-h-[36px] w-full px-2.5 py-1.5 border border-line-strong rounded-md bg-surface text-ink text-[0.88rem] focus:border-accent" %}
+{% set textarea_cls = "w-full min-h-[62px] px-2.5 py-2 border border-line-strong rounded-md bg-surface text-ink text-[0.85rem] resize-y wrap-anywhere focus:border-accent" %}
+{% set check_cls = "inline-flex items-center gap-2 text-muted text-[0.875rem] min-w-0 [&_input]:flex-none [&_input]:size-[17px]" %}
+{% set search_cls = "flex items-center gap-2 min-h-[36px] px-2.5 py-[3px] border border-line-strong rounded-md bg-surface text-muted text-[0.86rem] max-w-full max-[540px]:w-full focus-within:border-accent [&_svg]:size-4" %}
+{% set subnav_cls = "inline-flex flex-wrap gap-1 p-1 mb-4 border border-line rounded-lg bg-wash max-w-full max-[540px]:w-full" %}
+{% set subnav_tab = "min-h-[34px] px-[13px] py-1.5 border border-transparent rounded-md text-muted text-[0.86rem] font-semibold bg-transparent whitespace-nowrap hover:text-ink aria-[selected=true]:text-accent aria-[selected=true]:bg-surface aria-[selected=true]:border-tint-line max-[540px]:flex-auto max-[540px]:text-center max-[540px]:px-[9px] max-[540px]:text-[0.82rem]" %}
+{% set h1_cls = "font-bold tracking-[-0.04em] leading-[1.14] text-[clamp(1.7rem,2.8vw,2.45rem)]" %}
+{% set h2_cls = "text-[1.24rem] font-semibold leading-[1.25] tracking-[-0.02em]" %}
+{% set drop_cls = "min-h-[186px] max-[540px]:min-h-[168px] grid grid-cols-[minmax(0,1fr)] content-center justify-items-center gap-[5px] px-3.5 py-[18px] border border-dashed border-line-strong rounded-[7px] text-center bg-wash [&.dragging]:border-2 [&.dragging]:border-dashed [&.dragging]:border-accent [&.dragging]:px-[13px] [&.dragging]:py-[17px] [&.dragging]:bg-tint" %}
+{% set return_link = "inline-flex items-center gap-[7px] text-[0.88rem] text-muted mb-4 no-underline hover:text-accent hover:underline [&_svg]:size-4" %}
+{% set th_cls = "px-3 py-2.5 border-t border-line bg-wash text-muted font-semibold text-[0.82rem] whitespace-nowrap align-middle group-has-[#table-controls[hidden]]/tbl:border-t-0" %}
+{% set export_menu = "absolute z-12 right-0 max-[540px]:right-auto max-[540px]:left-0 max-[540px]:max-w-[calc(100vw-24px)] top-[calc(100%+5px)] w-max min-w-[120px] p-[5px] border border-line-strong rounded-lg bg-surface shadow-[0_10px_26px_var(--backdrop)] [&_a]:block [&_a]:py-[7px] [&_a]:px-2.5 [&_a]:rounded-[5px] [&_a]:text-[0.86rem] [&_a]:whitespace-nowrap [&_a]:no-underline [&_a]:text-ink [&_a:hover]:bg-tint [&_a:hover]:text-accent" %}
 <!doctype html>
 <html lang="es">
 <head>
@@ -18,161 +44,167 @@
   <script defer src="/static/investigations.js"></script>
   <script defer src="/static/app.js"></script>
 </head>
-<body>
-<a href="#main" class="sr-only focus:not-sr-only skip">Saltar al contenido</a>
-<header class="app-header">
-  <div class="app-bar">
-    <div class="app-bar-context">
-      <a href="#workspace" class="brand" aria-label="La Orca, Inspector de metadatos" title="La Orca · Inspector de metadatos">
-        <img src="/static/mark.svg" width="30" height="30" alt="">
-        <span class="brand-text"><strong>La Orca</strong><small>Inspector de metadatos</small></span>
+<body class="min-h-svh flex flex-col bg-base text-ink text-base font-sans overflow-x-clip">
+<a href="#main" class="skip sr-only focus:not-sr-only fixed z-40 top-3 left-3 px-3.5 py-2.5 rounded-md bg-accent text-on-accent no-underline">Saltar al contenido</a>
+<header class="sticky top-0 z-35 h-[var(--topbar-height)] border-b border-line bg-surface shrink-0">
+  <div class="flex justify-between items-center gap-3.5 max-[540px]:gap-2 h-full pl-[15px] pr-[var(--gutter)] max-[540px]:px-2.5 min-w-0">
+    <div class="flex items-center gap-[11px] min-w-0 flex-auto">
+      <a href="#workspace" class="inline-flex items-center gap-2.5 flex-none no-underline text-inherit" aria-label="La Orca, Inspector de metadatos" title="La Orca · Inspector de metadatos">
+        <img src="/static/mark.svg" width="30" height="30" alt="" class="size-[30px] flex-none block">
+        <span class="flex flex-col min-w-0">
+          <strong class="block whitespace-nowrap text-[0.98rem] font-bold tracking-[-0.025em] leading-[1.15] text-ink">La Orca</strong>
+          <small class="block whitespace-nowrap mt-px text-[0.72rem] leading-[1.2] text-muted max-[540px]:hidden">Inspector de metadatos</small>
+        </span>
       </a>
-      <span class="app-bar-sep" aria-hidden="true">/</span>
-      <span id="topbar-context" class="topbar-context">Analizador de archivos</span>
+      <span class="text-line-strong text-[0.95rem] select-none flex-none max-[540px]:hidden" aria-hidden="true">/</span>
+      <span id="topbar-context" class="text-[0.88rem] font-semibold text-muted whitespace-nowrap overflow-hidden text-ellipsis min-w-0 max-[540px]:hidden">Analizador de archivos</span>
     </div>
-    <div class="app-bar-controls">
-      <span class="health" role="status"><span id="engine-dot"></span><span id="engine">Comprobando ExifTool</span></span>
-      <button id="theme-toggle" class="button icon-button theme-toggle" type="button" aria-label="Cambiar tema" aria-pressed="false" title="Cambiar entre tema claro y oscuro">
-        {{icon('moon', 'icon theme-moon')}}{{icon('sun', 'icon theme-sun')}}
+    <div class="flex items-center gap-2.5 shrink-0">
+      <span class="inline-flex items-center gap-[7px] py-1 px-2.5 max-[540px]:py-[3px] max-[540px]:px-2 border border-line rounded-full bg-wash text-muted whitespace-nowrap text-[0.78rem] max-[540px]:text-[0.72rem] font-medium" role="status">
+        <span id="engine-dot" class="block flex-none size-[7px] rounded-full bg-muted data-[ready=yes]:bg-success data-[ready=no]:bg-error"></span>
+        <span id="engine">Comprobando ExifTool</span>
+      </span>
+      <button id="theme-toggle" class="{{ btn_icon }}" type="button" aria-label="Cambiar tema" aria-pressed="false" title="Cambiar entre tema claro y oscuro">
+        {{icon('moon', 'icon dark:hidden')}}{{icon('sun', 'icon hidden dark:block')}}
       </button>
     </div>
   </div>
 </header>
-<div class="app-shell" id="app-shell">
-  <div class="sidebar-shell" id="sidebar-shell">
-    <aside id="sidebar" class="sidebar" aria-label="Navegación principal" data-pinned="false">
-      <div id="sidebar-tools" class="sidebar-tools">
-        <nav class="app-nav sidebar-nav" aria-label="Principal">
-          <a class="sidebar-tool" href="#workspace" data-page="workspace" aria-current="page"
-            aria-label="Analizador" title="Analizador">{{icon('scan')}}<span class="sidebar-label">Analizador</span></a>
-          <a class="sidebar-tool" href="#investigations" data-page="investigations"
-            aria-label="Investigaciones" title="Investigaciones">{{icon('case')}}<span class="sidebar-label">Investigaciones</span></a>
-          <a class="sidebar-tool" href="#duel" data-page="duel"
-            aria-label="Duelo" title="Duelo">{{icon('compare')}}<span class="sidebar-label">Duelo</span></a>
-          <a class="sidebar-tool" href="#hashes" data-page="hashes"
-            aria-label="Laboratorio de hashes" title="Laboratorio de hashes">{{icon('hash')}}<span class="sidebar-label">Laboratorio de hashes</span></a>
-          <a class="sidebar-tool" href="#history" data-page="history" aria-label="Historial" title="Historial">
-            {{icon('history')}}<span class="sidebar-label">Historial</span></a>
-          <a class="sidebar-tool" href="#manifests" data-page="manifests"
-            aria-label="Manifiestos" title="Manifiestos">{{icon('manifest')}}<span class="sidebar-label">Manifiestos</span></a>
-          <a class="sidebar-tool" href="#guide" data-page="guide" aria-label="Guía de uso" title="Guía de uso">
-            {{icon('help')}}<span class="sidebar-label">Guía de uso</span></a>
+<div class="grid grid-cols-[var(--rail)_minmax(0,1fr)] md:has-[#sidebar[data-pinned=true]]:grid-cols-[var(--sidebar-width)_minmax(0,1fr)] flex-1 min-w-0" id="app-shell">
+  <div class="group/sidebar relative z-30 shrink-0 w-[var(--rail)] md:has-[#sidebar[data-pinned=true]]:w-[var(--sidebar-width)]" id="sidebar-shell">
+    <aside id="sidebar" class="fixed top-[var(--topbar-height)] bottom-0 left-0 z-30 w-[var(--rail)] h-[calc(100dvh-var(--topbar-height))] flex flex-col bg-surface border-r border-line overflow-hidden transition-[width,box-shadow] duration-[180ms] ease-[cubic-bezier(.2,0,0,1)] group-hover/sidebar:w-[var(--sidebar-width)] group-hover/sidebar:shadow-[10px_0_28px_var(--backdrop)] group-focus-within/sidebar:w-[var(--sidebar-width)] group-focus-within/sidebar:shadow-[10px_0_28px_var(--backdrop)] data-[pinned=true]:w-[var(--sidebar-width)] data-[pinned=true]:shadow-[10px_0_28px_var(--backdrop)] md:data-[pinned=true]:shadow-none!" aria-label="Navegación principal" data-pinned="false">
+      <div id="sidebar-tools" class="py-2.5 px-2 overflow-y-auto overflow-x-hidden flex-1 min-h-0">
+        <nav class="grid grid-cols-[minmax(0,1fr)] gap-[3px]" aria-label="Principal">
+          <a class="{{ sidebar_tool }}" href="#workspace" data-page="workspace" aria-current="page"
+            aria-label="Analizador" title="Analizador">{{icon('scan')}}<span class="{{ sidebar_label }}">Analizador</span></a>
+          <a class="{{ sidebar_tool }}" href="#investigations" data-page="investigations"
+            aria-label="Investigaciones" title="Investigaciones">{{icon('case')}}<span class="{{ sidebar_label }}">Investigaciones</span></a>
+          <a class="{{ sidebar_tool }}" href="#duel" data-page="duel"
+            aria-label="Duelo" title="Duelo">{{icon('compare')}}<span class="{{ sidebar_label }}">Duelo</span></a>
+          <a class="{{ sidebar_tool }}" href="#hashes" data-page="hashes"
+            aria-label="Laboratorio de hashes" title="Laboratorio de hashes">{{icon('hash')}}<span class="{{ sidebar_label }}">Laboratorio de hashes</span></a>
+          <a class="{{ sidebar_tool }}" href="#history" data-page="history" aria-label="Historial" title="Historial">
+            {{icon('history')}}<span class="{{ sidebar_label }}">Historial</span></a>
+          <a class="{{ sidebar_tool }}" href="#manifests" data-page="manifests"
+            aria-label="Manifiestos" title="Manifiestos">{{icon('manifest')}}<span class="{{ sidebar_label }}">Manifiestos</span></a>
+          <a class="{{ sidebar_tool }}" href="#guide" data-page="guide" aria-label="Guía de uso" title="Guía de uso">
+            {{icon('help')}}<span class="{{ sidebar_label }}">Guía de uso</span></a>
         </nav>
-        <nav id="file-tools" class="sidebar-nav file-tools" aria-label="Vistas del archivo" hidden></nav>
+        <nav id="file-tools" class="grid grid-cols-[minmax(0,1fr)] gap-[3px] border-t border-line mt-2.5 pt-2.5" aria-label="Vistas del archivo" hidden></nav>
       </div>
-      <div class="sidebar-footer">
-        <button id="sidebar-toggle" class="sidebar-tool sidebar-pin" type="button" aria-pressed="false"
+      <div class="p-2 border-t border-line shrink-0">
+        <button id="sidebar-toggle" class="{{ sidebar_tool }} [&[aria-pressed=true]>svg]:-scale-x-100" type="button" aria-pressed="false"
           aria-controls="sidebar-tools" aria-label="Fijar barra lateral" title="Fijar barra lateral">
-          {{icon('sidebar')}}<span class="sidebar-label" id="sidebar-pin-label">Fijar barra</span>
+          {{icon('sidebar')}}<span class="{{ sidebar_label }}" id="sidebar-pin-label">Fijar barra</span>
         </button>
       </div>
     </aside>
   </div>
-  <div class="app-content">
-<main id="main" class="workspace" tabindex="-1">
-  <section id="page-workspace">
-    <header class="page-head workspace-head">
+  <div class="flex flex-col min-w-0">
+<main id="main" class="flex flex-col w-[min(100%,calc(var(--width)+var(--gutter)*2))] flex-1 mx-auto px-[var(--gutter)] max-md:px-[14px] max-[540px]:px-2.5 pt-[clamp(20px,2.8vw,34px)] max-md:pt-[18px] min-w-0" tabindex="-1">
+  <section id="page-workspace" class="min-w-0 w-full mb-[clamp(28px,4vw,48px)]">
+    <header class="mb-[22px] flex items-end justify-between flex-wrap gap-x-[18px] gap-y-3">
       <div>
-        <h1 tabindex="-1">Inspección de metadatos</h1>
-        <p>Examina qué revelan tus archivos sobre su origen y creación.</p>
+        <h1 class="{{ h1_cls }}" tabindex="-1">Inspección de metadatos</h1>
+        <p class="mt-1.5 text-muted text-[0.95rem] max-w-[72ch]">Examina qué revelan tus archivos sobre su origen y creación.</p>
       </div>
-      <button id="reopen-upload" class="button primary" type="button" aria-controls="intake" hidden>{{icon('plus')}} Nuevo análisis</button>
+      <button id="reopen-upload" class="{{ btn_primary }}" type="button" aria-controls="intake" hidden>{{icon('plus')}} Nuevo análisis</button>
     </header>
-    <div id="intake" class="intake">
-      <section class="panel upload-panel" aria-labelledby="load-title">
-        <div class="intake-head">
-          <div class="panel-label">{{icon('upload')}}<h2 id="load-title">Cargar archivos</h2></div>
-          <div class="intake-tools">
-            <details class="format-disclosure">
-              <summary>{{icon('help')}} Formatos y límites</summary>
-              <div class="format-content">
-                <dl>
-                  <div><dt>Documentos</dt><dd>PDF, DOCX, XLSX, PPTX</dd></div>
-                  <div><dt>Imágenes</dt><dd>JPEG, PNG, WebP</dd></div>
-                  <div><dt>Contenedores</dt><dd>ZIP de hasta 100 MB</dd></div>
+    <div id="intake" class="grid grid-cols-[minmax(0,1.35fr)_minmax(300px,1fr)] max-[960px]:grid-cols-1 gap-4 items-stretch min-w-0">
+      <section class="{{ panel_cls }} px-[18px] max-[540px]:px-3 flex flex-col min-w-0" aria-labelledby="load-title">
+        <div class="flex items-center justify-between gap-x-4 gap-y-2 flex-wrap py-3 min-h-[52px]">
+          <div class="flex items-center gap-[9px] min-w-0 [&_svg]:text-accent [&_svg]:size-[17px]">{{icon('upload')}}<h2 id="load-title" class="text-[0.98rem] font-semibold tracking-[-0.012em]">Cargar archivos</h2></div>
+          <div class="flex items-center gap-[9px] min-w-0">
+            <details class="relative group/fmt">
+              <summary class="flex items-center gap-[7px] list-none whitespace-nowrap py-1.5 px-1 text-[0.83rem] text-muted font-semibold hover:text-accent group-open/fmt:text-accent [&_svg]:size-[15px]">{{icon('help')}} Formatos y límites</summary>
+              <div class="absolute z-12 right-0 top-[calc(100%+5px)] w-[min(300px,calc(100vw-32px))] py-[11px] px-[13px] border border-line-strong rounded-lg bg-surface shadow-[0_10px_26px_var(--backdrop)] text-[0.85rem]">
+                <dl class="divide-y divide-transparent">
+                  <div class="py-[5px] grid grid-cols-[96px_minmax(0,1fr)] gap-1.5"><dt class="font-semibold">Documentos</dt><dd class="text-muted">PDF, DOCX, XLSX, PPTX</dd></div>
+                  <div class="py-[5px] grid grid-cols-[96px_minmax(0,1fr)] gap-1.5"><dt class="font-semibold">Imágenes</dt><dd class="text-muted">JPEG, PNG, WebP</dd></div>
+                  <div class="py-[5px] grid grid-cols-[96px_minmax(0,1fr)] gap-1.5"><dt class="font-semibold">Contenedores</dt><dd class="text-muted">ZIP de hasta 100 MB</dd></div>
                 </dl>
-                <p>Hasta 100 archivos por análisis, incluidos los miembros del ZIP. Las cargas directas admiten hasta 100 MB en total.</p>
+                <p class="mt-1.5 pt-2 border-t border-line text-muted">Hasta 100 archivos por análisis, incluidos los miembros del ZIP. Las cargas directas admiten hasta 100 MB en total.</p>
               </div>
             </details>
-            <button id="collapse-upload" class="button icon-button" type="button" aria-label="Plegar carga" title="Plegar carga" hidden>{{icon('x')}}</button>
+            <button id="collapse-upload" class="{{ btn_icon }}" type="button" aria-label="Plegar carga" title="Plegar carga" hidden>{{icon('x')}}</button>
           </div>
         </div>
-        <div id="drop" class="drop">
-          <div class="upload-glyph">{{icon('file-stack')}}</div>
-          <p class="drop-title">Arrastra archivos aquí</p>
-          <p class="drop-note">Admite documentos, imágenes y archivos ZIP.</p>
-          <button id="pick" class="button subtle" type="button">{{icon('plus')}} Seleccionar archivos</button>
+        <div id="drop" class="{{ drop_cls }} flex-auto">
+          <div class="grid place-items-center size-[46px] mb-1 bg-tint rounded-[9px] text-accent [&_svg]:size-[27px] [&_svg]:stroke-[1.45]">{{icon('file-stack')}}</div>
+          <p class="text-[1.1rem] font-semibold tracking-[-0.018em]">Arrastra archivos aquí</p>
+          <p class="text-muted text-[0.88rem]">Admite documentos, imágenes y archivos ZIP.</p>
+          <button id="pick" class="{{ btn_subtle }} mt-2" type="button">{{icon('plus')}} Seleccionar archivos</button>
           <input id="picker" type="file" multiple hidden aria-label="Seleccionar archivos">
         </div>
-        <ul id="queue" class="queue" hidden aria-label="Archivos seleccionados"></ul>
-        <div class="upload-actions">
-          <label class="check"><input id="keep" type="checkbox"> Guardar en el historial</label>
+        <ul id="queue" class="max-h-[220px] overflow-auto mt-2.5 divide-y divide-line [&_svg]:text-muted" hidden aria-label="Archivos seleccionados"></ul>
+        <div class="flex items-center justify-between gap-x-4 gap-y-2 flex-wrap min-h-[60px] py-[11px]">
+          <label class="{{ check_cls }}"><input id="keep" type="checkbox"> Guardar en el historial</label>
           <div class="flex flex-wrap items-center gap-2">
-            <button id="reset" class="button quiet" type="button" hidden>Vaciar</button>
-            <button id="analyze" class="button primary" type="button" disabled>{{icon('scan')}} Analizar</button>
+            <button id="reset" class="{{ btn_quiet }}" type="button" hidden>Vaciar</button>
+            <button id="analyze" class="{{ btn_primary }}" type="button" disabled>{{icon('scan')}} Analizar</button>
           </div>
         </div>
       </section>
-      <aside id="intake-context" class="panel context-panel" aria-labelledby="context-title" aria-live="polite">
-        <div class="intake-head">
-          <div class="panel-label">{{icon('layers')}}<h2 id="context-title">Cómo funciona</h2></div>
+      <aside id="intake-context" class="{{ panel_cls }} px-[18px] pb-4 flex flex-col min-w-0" aria-labelledby="context-title" aria-live="polite">
+        <div class="flex items-center justify-between gap-x-4 gap-y-2 flex-wrap py-3 min-h-[52px]">
+          <div class="flex items-center gap-[9px] min-w-0 [&_svg]:text-accent [&_svg]:size-[17px]">{{icon('layers')}}<h2 id="context-title" class="text-[0.98rem] font-semibold tracking-[-0.012em]">Cómo funciona</h2></div>
         </div>
-        <div id="intake-context-body" class="context-body"></div>
+        <div id="intake-context-body" class="flex-auto flex flex-col justify-between gap-3.5 min-w-0"></div>
       </aside>
     </div>
-        <div id="upload-message" class="notice" role="status" hidden></div>
-        <div id="progress-box" class="panel progress-box" hidden>
-          <div class="flex justify-between gap-3"><strong id="progress-title"></strong><span class="mono" id="progress-count"></span></div>
-          <progress id="progress" max="1" aria-label="Archivos procesados"></progress>
-          <p id="progress-current" class="muted small" aria-live="polite"></p>
+        <div id="upload-message" class="{{ notice_cls }} mt-3" role="status" hidden></div>
+        <div id="progress-box" class="{{ panel_cls }} mt-3 py-[13px] px-4" hidden>
+          <div class="flex justify-between gap-3"><strong id="progress-title"></strong><span class="font-mono" id="progress-count"></span></div>
+          <progress id="progress" class="block w-full my-2" max="1" aria-label="Archivos procesados"></progress>
+          <p id="progress-current" class="text-muted text-[0.875rem]" aria-live="polite"></p>
         </div>
-        <section class="results" aria-labelledby="results-title">
-          <div class="section-head flex flex-wrap items-center justify-between gap-3">
-            <div><h2 id="results-title">Resultados de la sesión</h2><p id="result-meta" class="muted" hidden></p></div>
+        <section class="mt-7 min-w-0" aria-labelledby="results-title">
+          <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div><h2 id="results-title" class="{{ h2_cls }}">Resultados de la sesión</h2><p id="result-meta" class="mt-1 text-[0.86rem] text-muted" hidden></p></div>
             <div id="result-actions" class="flex flex-wrap gap-2" hidden>
-              <details class="exports"><summary class="button subtle">{{icon('download')}} Exportar</summary><div id="downloads"></div></details>
-              <button class="button subtle" id="close-session" type="button">Eliminar sesión</button>
+              <details class="relative"><summary class="{{ btn_subtle }} list-none">{{icon('download')}} Exportar</summary><div id="downloads" class="{{ export_menu }}"></div></details>
+              <button class="{{ btn_subtle }}" id="close-session" type="button">Eliminar sesión</button>
             </div>
           </div>
-          <div class="session-summary" id="session-summary" hidden>
-            <div id="stats" class="stats" aria-label="Resumen de la sesión"></div>
-            <details class="overview"><summary>{{icon('layers')}} Distribución y autores</summary><div id="breakdown" class="breakdown"></div></details>
+          <div class="flex items-center has-[details[open]]:items-start justify-between flex-wrap gap-x-4 gap-y-2.5 border-y border-line py-3 mb-4" id="session-summary" hidden>
+            <div id="stats" class="flex flex-wrap gap-2 items-center min-w-0" aria-label="Resumen de la sesión"></div>
+            <details class="group/ov open:basis-full"><summary class="flex items-center gap-[7px] list-none whitespace-nowrap text-muted py-1 px-1.5 text-[0.86rem] font-semibold rounded-md hover:text-accent hover:bg-wash group-open/ov:text-accent group-open/ov:bg-wash [&_svg]:size-[15px]">{{icon('layers')}} Distribución y autores</summary><div id="breakdown" class="grid grid-cols-4 max-md:grid-cols-2 gap-4 pt-3 pb-1"></div></details>
           </div>
           <div id="results">
-            <section class="panel table-panel" aria-labelledby="files-title">
-              <div id="table-controls" class="table-controls flex flex-wrap items-center gap-2" hidden>
-                <h3 class="mr-auto">Archivos <span id="match-count" class="muted"></span></h3>
-                <label class="search flex items-center gap-2">{{icon('search')}}<span class="sr-only">Buscar archivos</span><input id="search" type="search" placeholder="Buscar archivos"></label>
-                <label class="sr-only" for="format-filter">Filtrar formato</label><select id="format-filter"></select>
-                <label class="sr-only" for="status-filter">Filtrar estado</label><select id="status-filter"></select>
+            <section class="{{ panel_cls }} mb-3.5 group/tbl" aria-labelledby="files-title">
+              <div id="table-controls" class="py-3 px-3.5 flex flex-wrap items-center gap-2" hidden>
+                <h3 class="mr-auto text-base font-semibold leading-[1.3] max-[540px]:w-full">Archivos <span id="match-count" class="text-muted ml-[5px] font-normal text-[0.83rem]"></span></h3>
+                <label class="{{ search_cls }}">{{icon('search')}}<span class="sr-only">Buscar archivos</span><input id="search" class="min-w-0 w-[clamp(9rem,18vw,15rem)] max-[540px]:flex-1 max-[540px]:w-full text-ink bg-transparent border-0 outline-none placeholder:text-muted placeholder:opacity-100" type="search" placeholder="Buscar archivos"></label>
+                <label class="sr-only" for="format-filter">Filtrar formato</label><select id="format-filter" class="{{ select_cls }}"></select>
+                <label class="sr-only" for="status-filter">Filtrar estado</label><select id="status-filter" class="{{ select_cls }}"></select>
               </div>
-              <div id="duel-toolbar" class="duel-toolbar" hidden>
-                <span id="duel-selection" class="small muted" role="status"></span>
+              <div id="duel-toolbar" class="flex items-center justify-between flex-wrap gap-x-3.5 gap-y-2 py-2.5 px-3.5 border-t border-line bg-base" hidden>
+                <span id="duel-selection" class="text-[0.875rem] text-muted break-words min-w-0" role="status"></span>
                 <div class="flex flex-wrap gap-2">
-                  <button class="button subtle" id="duel-clear" type="button" hidden>Quitar selección</button>
-                  <button class="button accent-button" id="duel-open" type="button" disabled>Comparar archivos</button>
+                  <button class="{{ btn_subtle }}" id="duel-clear" type="button" hidden>Quitar selección</button>
+                  <button class="{{ btn_accent }}" id="duel-open" type="button" disabled>Comparar archivos</button>
                 </div>
               </div>
-              <div class="scroll-table" role="region" tabindex="0" aria-label="Tabla de archivos">
-                <table id="file-table">
+              <div class="w-full max-w-full overflow-x-auto rounded-b-[9px] group-has-[#table-controls[hidden]]/tbl:rounded-[inherit]" role="region" tabindex="0" aria-label="Tabla de archivos">
+                <table id="file-table" class="border-collapse w-full text-[0.865rem] text-left min-w-[980px] has-[#empty-results:not([hidden])]:min-w-0 max-md:has-[#empty-results:not([hidden])]:[&_thead]:hidden">
                   <caption id="files-title" class="sr-only">Archivos de la sesión</caption>
                   <thead><tr>
-                    <th scope="col" id="duel-column" hidden><span class="sr-only">Selección para el duelo</span></th>
-                    <th scope="col"><button data-sort="name">Archivo</button></th>
-                    <th scope="col"><button data-sort="format">Formato</button></th>
-                    <th scope="col"><button data-sort="size">Tamaño</button></th>
-                    <th scope="col"><button data-sort="author">Autor o creador</button></th>
-                    <th scope="col"><button data-sort="software">Software</button></th>
-                    <th scope="col"><button data-sort="date">Fecha</button></th>
-                    <th scope="col"><button data-sort="field_count">Propiedades</button></th>
-                    <th scope="col"><button data-sort="status">Estado</button></th>
-                    <th scope="col"><span class="sr-only">Detalles</span></th>
+                    <th scope="col" id="duel-column" class="{{ th_cls }}" hidden><span class="sr-only">Selección para el duelo</span></th>
+                    <th scope="col" class="{{ th_cls }}"><button class="text-left whitespace-nowrap hover:text-accent" data-sort="name">Archivo</button></th>
+                    <th scope="col" class="{{ th_cls }}"><button class="text-left whitespace-nowrap hover:text-accent" data-sort="format">Formato</button></th>
+                    <th scope="col" class="{{ th_cls }}"><button class="text-left whitespace-nowrap hover:text-accent" data-sort="size">Tamaño</button></th>
+                    <th scope="col" class="{{ th_cls }}"><button class="text-left whitespace-nowrap hover:text-accent" data-sort="author">Autor o creador</button></th>
+                    <th scope="col" class="{{ th_cls }}"><button class="text-left whitespace-nowrap hover:text-accent" data-sort="software">Software</button></th>
+                    <th scope="col" class="{{ th_cls }}"><button class="text-left whitespace-nowrap hover:text-accent" data-sort="date">Fecha</button></th>
+                    <th scope="col" class="{{ th_cls }}"><button class="text-left whitespace-nowrap hover:text-accent" data-sort="field_count">Propiedades</button></th>
+                    <th scope="col" class="{{ th_cls }}"><button class="text-left whitespace-nowrap hover:text-accent" data-sort="status">Estado</button></th>
+                    <th scope="col" class="{{ th_cls }}"><span class="sr-only">Detalles</span></th>
                   </tr></thead>
                   <tbody id="empty-results">
-                    <tr><td colspan="9" class="empty-cell">
-                      <div class="empty">
-                        <span class="empty-icon">{{icon('table')}}</span>
-                        <div><strong>Todavía no hay resultados</strong><p>Los archivos analizados aparecerán en esta tabla.</p></div>
+                    <tr><td colspan="9" class="p-0 bg-surface border-t border-line">
+                      <div class="min-h-[155px] grid grid-cols-[minmax(0,1fr)] content-center justify-items-center gap-[7px] p-[18px] text-center">
+                        <span class="grid place-items-center w-10 h-[38px] rounded-lg border border-line bg-wash text-muted">{{icon('table')}}</span>
+                        <div><strong class="font-semibold">Todavía no hay resultados</strong><p class="text-muted text-[0.88rem] mt-0.5 max-w-[52ch]">Los archivos analizados aparecerán en esta tabla.</p></div>
                       </div>
                     </td></tr>
                   </tbody>
@@ -180,153 +212,153 @@
                 </table>
               </div>
             </section>
-            <details id="correlation-panel" class="panel correlations" hidden>
-              <summary>Coincidencias entre archivos</summary>
-              <p class="small muted">Abre una coincidencia para consultar los archivos y sus campos de origen.</p>
+            <details id="correlation-panel" class="{{ panel_cls }} py-4 px-[18px]" hidden>
+              <summary class="font-semibold">Coincidencias entre archivos</summary>
+              <p class="text-[0.875rem] text-muted mt-1.5 mb-3">Abre una coincidencia para consultar los archivos y sus campos de origen.</p>
               <div id="correlations"></div>
             </details>
           </div>
         </section>
       </section>
-      <section id="page-history" hidden>
-        <header class="page-head"><h1 tabindex="-1">Historial local</h1><p>Consulta los análisis que elegiste guardar en este equipo.</p></header>
-        <section class="panel history">
-          <div class="section-head flex flex-wrap items-center justify-between gap-3">
-            <div><h2>Sesiones guardadas</h2><p class="muted small">Se guardan nombres, hashes, metadatos, hallazgos y errores de análisis.</p></div>
-            <button id="clear-history" class="button subtle" type="button" disabled>Eliminar historial</button>
+      <section id="page-history" class="min-w-0 w-full mb-[clamp(28px,4vw,48px)]" hidden>
+        <header class="mb-[22px]"><h1 class="{{ h1_cls }}" tabindex="-1">Historial local</h1><p class="mt-1.5 text-muted text-[0.95rem] max-w-[72ch]">Consulta los análisis que elegiste guardar en este equipo.</p></header>
+        <section class="{{ panel_cls }} py-4 px-[18px]">
+          <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div><h2 class="{{ h2_cls }}">Sesiones guardadas</h2><p class="text-muted text-[0.875rem] mt-1">Se guardan nombres, hashes, metadatos, hallazgos y errores de análisis.</p></div>
+            <button id="clear-history" class="{{ btn_subtle }}" type="button" disabled>Eliminar historial</button>
           </div>
-          <div id="history-message" class="notice" role="status" hidden></div>
+          <div id="history-message" class="{{ notice_cls }}" role="status" hidden></div>
           <div id="history-list"></div>
         </section>
       </section>
-      <section id="page-guide" hidden>
-        <header class="page-head"><h1 tabindex="-1">Guía de uso</h1><p>Cómo interpretar metadatos, similitud documental, hashes y manifiestos de integridad.</p></header>
-        <section class="panel guide">
-          <h2>Inspección y comparación profunda</h2>
+      <section id="page-guide" class="min-w-0 w-full max-w-[var(--width-reading)] mb-[clamp(28px,4vw,48px)]" hidden>
+        <header class="mb-[22px]"><h1 class="{{ h1_cls }}" tabindex="-1">Guía de uso</h1><p class="mt-1.5 text-muted text-[0.95rem] max-w-[72ch]">Cómo interpretar metadatos, similitud documental, hashes y manifiestos de integridad.</p></header>
+        <section class="{{ panel_cls }} py-4 px-[18px] grid grid-cols-[minmax(0,1fr)] gap-3 [&_p]:max-w-[78ch] [&_p]:text-muted [&_p]:leading-[1.55] [&_dl]:max-w-[78ch] [&_dl]:text-muted [&_dl]:leading-[1.55]">
+          <h2 class="{{ h2_cls }}">Inspección y comparación profunda</h2>
           <p>Selecciona archivos propios, abre un resultado y consulta el campo original de cada valor normalizado. En <strong>Duelo de documentos</strong>, Orca evalúa tres dimensiones independientes: identidad binaria (SHA-256 y tamaño), similitud profunda de contenido (actualmente para PPTX: texto por diapositiva, orden, imágenes/multimedia y estructura) y comparación de metadatos descriptivos y técnicos.</p>
           <p>La similitud documental para PPTX combina contenido textual (50%), recursos multimedia (25%), estructura (15%) y metadatos descriptivos (10%), redistribuyendo de forma proporcional las dimensiones no aplicables. Las etiquetas técnicas se excluyen del porcentaje de metadatos y nunca se emite un porcentaje global para formatos sin analizador de contenido. Una similitud alta no implica equivalencia visual ni funcional.</p>
-          <h2>Laboratorio de hashes y manifiestos</h2>
+          <h2 class="{{ h2_cls }} mt-2.5">Laboratorio de hashes y manifiestos</h2>
           <p>Calcula hashes MD5, SHA-1, SHA-256 (predeterminado) y SHA-512 mediante lectura en bloques sin cargar el archivo completo en memoria. MD5 y SHA-1 son algoritmos heredados y no deben utilizarse como garantía criptográfica moderna frente a colisiones. El historial de hashes guarda únicamente registros ligeros en SQLite (sin copias de archivos) y permite verificar archivos nuevamente.</p>
           <p>Los <strong>Manifiestos de integridad</strong> generan y verifican archivos JSON con rutas relativas normalizadas y hashes. Un manifiesto verifica integridad respecto a esa referencia, pero no autenticidad, ya que un JSON sin firma digital puede modificarse.</p>
-          <h2>Limpieza por formato</h2>
-          <dl>{% for kind, policy in policies.items() %}<div><dt>{{ kind }}</dt><dd>{{ policy }}</dd></div>{% endfor %}<div><dt>WebP</dt><dd>Disponible para inspección.</dd></div></dl>
+          <h2 class="{{ h2_cls }} mt-2.5">Limpieza por formato</h2>
+          <dl>{% for kind, policy in policies.items() %}<div class="grid grid-cols-[78px_minmax(0,1fr)] gap-2.5 py-[9px] border-t border-line"><dt class="text-ink font-semibold">{{ kind }}</dt><dd>{{ policy }}</dd></div>{% endfor %}<div class="grid grid-cols-[78px_minmax(0,1fr)] gap-2.5 py-[9px] border-t border-line"><dt class="text-ink font-semibold">WebP</dt><dd>Disponible para inspección.</dd></div></dl>
           <p>La limpieza comprueba los metadatos que ExifTool puede leer. También pueden existir datos en el texto, en revisiones, en perfiles o en archivos incrustados. Los PDF cifrados y los archivos con firmas detectadas o macros no se limpian.</p>
-          <h2>Retención</h2>
+          <h2 class="{{ h2_cls }} mt-2.5">Retención</h2>
           <p>Los archivos originales y las copias de descarga son temporales. Se eliminan al cerrar la sesión o al terminar la retención de {{ minutes }} min. Las sesiones guardadas y el historial de hashes en SQLite se pueden eliminar desde Historial o el Laboratorio. Descarga la copia antes de cerrar la sesión.</p>
         </section>
       </section>
-      <section id="page-hashes" hidden>
-        <header class="page-head">
-          <h1 tabindex="-1">Laboratorio de hashes</h1>
-          <p>Calcula, compara, guarda y vuelve a verificar huellas criptográficas sin almacenar copias de tus archivos.</p>
+      <section id="page-hashes" class="min-w-0 w-full mb-[clamp(28px,4vw,48px)]" hidden>
+        <header class="mb-[22px]">
+          <h1 class="{{ h1_cls }}" tabindex="-1">Laboratorio de hashes</h1>
+          <p class="mt-1.5 text-muted text-[0.95rem] max-w-[72ch]">Calcula, compara, guarda y vuelve a verificar huellas criptográficas sin almacenar copias de tus archivos.</p>
         </header>
-        <div class="subnav" role="tablist" aria-label="Herramientas del laboratorio de hashes">
-          <button type="button" role="tab" class="subnav-tab" data-hash-tab="calc" aria-selected="true">Calculadora</button>
-          <button type="button" role="tab" class="subnav-tab" data-hash-tab="compare" aria-selected="false">Comparador</button>
-          <button type="button" role="tab" class="subnav-tab" data-hash-tab="history" aria-selected="false">Historial de hashes</button>
+        <div class="{{ subnav_cls }}" role="tablist" aria-label="Herramientas del laboratorio de hashes">
+          <button type="button" role="tab" class="{{ subnav_tab }}" data-hash-tab="calc" aria-selected="true">Calculadora</button>
+          <button type="button" role="tab" class="{{ subnav_tab }}" data-hash-tab="compare" aria-selected="false">Comparador</button>
+          <button type="button" role="tab" class="{{ subnav_tab }}" data-hash-tab="history" aria-selected="false">Historial de hashes</button>
         </div>
-        <div id="hash-tab-calc" class="lab-section">
-          <section class="panel lab-panel">
-            <div class="lab-head">
-              <h2>Calculadora de hashes</h2>
-              <p class="small muted">Procesamiento local en bloques de 128 kB para archivos grandes.</p>
+        <div id="hash-tab-calc" class="min-w-0">
+          <section class="{{ lab_panel }}">
+            <div>
+              <h2 class="{{ h2_cls }} mb-[3px]">Calculadora de hashes</h2>
+              <p class="text-[0.875rem] text-muted">Procesamiento local en bloques de 128 kB para archivos grandes.</p>
             </div>
-            <div id="hash-drop" class="drop drop-compact">
-              <div class="upload-glyph">{{icon('hash')}}</div>
-              <p class="drop-title">Selecciona o arrastra un archivo</p>
-              <p class="drop-note">Puedes cambiar los algoritmos seleccionados sin volver a elegir el archivo.</p>
-              <button id="hash-pick" class="button subtle" type="button">{{icon('plus')}} Seleccionar archivo</button>
+            <div id="hash-drop" class="{{ drop_cls }} min-h-[142px]">
+              <div class="grid place-items-center size-[46px] mb-1 bg-tint rounded-[9px] text-accent [&_svg]:size-[27px] [&_svg]:stroke-[1.45]">{{icon('hash')}}</div>
+              <p class="text-[1.1rem] font-semibold tracking-[-0.018em]">Selecciona o arrastra un archivo</p>
+              <p class="text-muted text-[0.88rem]">Puedes cambiar los algoritmos seleccionados sin volver a elegir el archivo.</p>
+              <button id="hash-pick" class="{{ btn_subtle }} mt-2" type="button">{{icon('plus')}} Seleccionar archivo</button>
               <input id="hash-picker" type="file" hidden aria-label="Seleccionar archivo para calcular hash">
             </div>
-            <div id="hash-file-meta" class="lab-file-meta" hidden></div>
-            <fieldset class="algo-fieldset">
-              <legend class="small muted">Algoritmos</legend>
-              <div class="algo-checks">
-                <label class="check"><input type="checkbox" name="hash-algo" value="SHA-256" checked> SHA-256 <span class="small muted">(predeterminado)</span></label>
-                <label class="check"><input type="checkbox" name="hash-algo" value="SHA-512"> SHA-512</label>
-                <label class="check"><input type="checkbox" name="hash-algo" value="SHA-1"> SHA-1 <span class="small muted">(heredado)</span></label>
-                <label class="check"><input type="checkbox" name="hash-algo" value="MD5"> MD5 <span class="small muted">(heredado)</span></label>
+            <div id="hash-file-meta" class="flex items-center justify-between flex-wrap gap-x-3.5 gap-y-2 py-2.5 px-[13px] border border-line rounded-[7px] bg-wash min-w-0" hidden></div>
+            <fieldset class="border border-line rounded-[7px] pt-2.5 px-3.5 pb-3 m-0 min-w-0">
+              <legend class="text-[0.875rem] text-muted px-[5px]">Algoritmos</legend>
+              <div class="flex flex-wrap gap-x-[18px] gap-y-2.5">
+                <label class="{{ check_cls }}"><input type="checkbox" name="hash-algo" value="SHA-256" checked> SHA-256 <span class="text-[0.875rem] text-muted">(predeterminado)</span></label>
+                <label class="{{ check_cls }}"><input type="checkbox" name="hash-algo" value="SHA-512"> SHA-512</label>
+                <label class="{{ check_cls }}"><input type="checkbox" name="hash-algo" value="SHA-1"> SHA-1 <span class="text-[0.875rem] text-muted">(heredado)</span></label>
+                <label class="{{ check_cls }}"><input type="checkbox" name="hash-algo" value="MD5"> MD5 <span class="text-[0.875rem] text-muted">(heredado)</span></label>
               </div>
             </fieldset>
-            <div id="hash-legacy-warning" class="notice" hidden></div>
-            <div class="lab-actions">
-              <label class="check"><input id="hash-auto-save" type="checkbox"> Guardar resultados en el historial</label>
+            <div id="hash-legacy-warning" class="{{ notice_cls }}" hidden></div>
+            <div class="flex items-center justify-between flex-wrap gap-x-4 gap-y-2.5 pt-2.5 border-t border-line">
+              <label class="{{ check_cls }}"><input id="hash-auto-save" type="checkbox"> Guardar resultados en el historial</label>
               <div class="flex flex-wrap gap-2">
-                <button id="hash-cancel" class="button subtle" type="button" hidden>Cancelar</button>
-                <button id="hash-run" class="button primary" type="button" disabled>{{icon('hash')}} Calcular</button>
+                <button id="hash-cancel" class="{{ btn_subtle }}" type="button" hidden>Cancelar</button>
+                <button id="hash-run" class="{{ btn_primary }}" type="button" disabled>{{icon('hash')}} Calcular</button>
               </div>
             </div>
-            <div id="hash-calc-status" class="notice" role="status" hidden></div>
-            <div id="hash-calc-results" class="hash-results"></div>
+            <div id="hash-calc-status" class="{{ notice_cls }}" role="status" hidden></div>
+            <div id="hash-calc-results" class="grid grid-cols-[minmax(0,1fr)] gap-2.5"></div>
           </section>
         </div>
-        <div id="hash-tab-compare" class="lab-section" hidden>
-          <section class="panel lab-panel">
-            <div class="lab-head">
-              <h2>Comparador de hashes</h2>
-              <p class="small muted">Valida formato y longitud antes de comparar. Admite mayúsculas, minúsculas y espacios accidentales alrededor.</p>
+        <div id="hash-tab-compare" class="min-w-0" hidden>
+          <section class="{{ lab_panel }}">
+            <div>
+              <h2 class="{{ h2_cls }} mb-[3px]">Comparador de hashes</h2>
+              <p class="text-[0.875rem] text-muted">Valida formato y longitud antes de comparar. Admite mayúsculas, minúsculas y espacios accidentales alrededor.</p>
             </div>
-            <div class="compare-controls">
-              <label class="field-group">
-                <span class="small muted">Algoritmo</span>
-                <select id="compare-algo">
+            <div class="flex items-end flex-wrap gap-x-3 gap-y-2.5">
+              <label class="grid grid-cols-[minmax(0,1fr)] gap-[5px] min-w-0">
+                <span class="text-[0.875rem] text-muted">Algoritmo</span>
+                <select id="compare-algo" class="{{ select_cls }}">
                   <option value="SHA-256" selected>SHA-256 (64 hex)</option>
                   <option value="SHA-512">SHA-512 (128 hex)</option>
                   <option value="SHA-1">SHA-1 (40 hex · heredado)</option>
                   <option value="MD5">MD5 (32 hex · heredado)</option>
                 </select>
               </label>
-              <button id="compare-swap" class="button subtle" type="button">{{icon('swap')}} Intercambiar A y B</button>
-              <button id="compare-clear" class="button quiet" type="button">Limpiar</button>
+              <button id="compare-swap" class="{{ btn_subtle }}" type="button">{{icon('swap')}} Intercambiar A y B</button>
+              <button id="compare-clear" class="{{ btn_quiet }}" type="button">Limpiar</button>
             </div>
-            <div id="compare-legacy-warning" class="notice" hidden></div>
-            <div class="compare-grid">
-              <div class="field-group">
-                <div class="field-label-row">
-                  <label for="compare-hash-a" class="small"><strong>Hash A</strong></label>
-                  <button id="compare-copy-a" class="button quiet small-btn" type="button">{{icon('copy')}} Copiar</button>
+            <div id="compare-legacy-warning" class="{{ notice_cls }}" hidden></div>
+            <div class="grid grid-cols-2 max-md:grid-cols-1 gap-3.5">
+              <div class="grid grid-cols-[minmax(0,1fr)] gap-[5px] min-w-0">
+                <div class="flex items-center justify-between gap-2">
+                  <label for="compare-hash-a" class="text-[0.875rem]"><strong>Hash A</strong></label>
+                  <button id="compare-copy-a" class="{{ btn_quiet_sm }}" type="button">{{icon('copy')}} Copiar</button>
                 </div>
-                <textarea id="compare-hash-a" class="hash-input mono" rows="2" spellcheck="false" placeholder="Pega el primer hash hexadecimal"></textarea>
-                <p id="compare-err-a" class="small error-text" hidden></p>
+                <textarea id="compare-hash-a" class="{{ textarea_cls }} font-mono" rows="2" spellcheck="false" placeholder="Pega el primer hash hexadecimal"></textarea>
+                <p id="compare-err-a" class="text-[0.875rem] text-error" hidden></p>
               </div>
-              <div class="field-group">
-                <div class="field-label-row">
-                  <label for="compare-hash-b" class="small"><strong>Hash B</strong></label>
-                  <button id="compare-copy-b" class="button quiet small-btn" type="button">{{icon('copy')}} Copiar</button>
+              <div class="grid grid-cols-[minmax(0,1fr)] gap-[5px] min-w-0">
+                <div class="flex items-center justify-between gap-2">
+                  <label for="compare-hash-b" class="text-[0.875rem]"><strong>Hash B</strong></label>
+                  <button id="compare-copy-b" class="{{ btn_quiet_sm }}" type="button">{{icon('copy')}} Copiar</button>
                 </div>
-                <textarea id="compare-hash-b" class="hash-input mono" rows="2" spellcheck="false" placeholder="Pega el segundo hash hexadecimal"></textarea>
-                <p id="compare-err-b" class="small error-text" hidden></p>
+                <textarea id="compare-hash-b" class="{{ textarea_cls }} font-mono" rows="2" spellcheck="false" placeholder="Pega el segundo hash hexadecimal"></textarea>
+                <p id="compare-err-b" class="text-[0.875rem] text-error" hidden></p>
               </div>
             </div>
-            <div class="lab-actions">
-              <span id="compare-copy-status" class="small muted" role="status"></span>
-              <button id="compare-run" class="button primary" type="button">{{icon('check')}} Comparar hashes</button>
+            <div class="flex items-center justify-between flex-wrap gap-x-4 gap-y-2.5 pt-2.5 border-t border-line">
+              <span id="compare-copy-status" class="text-[0.875rem] text-muted" role="status"></span>
+              <button id="compare-run" class="{{ btn_primary }}" type="button">{{icon('check')}} Comparar hashes</button>
             </div>
-            <div id="compare-result" class="compare-result" role="status" hidden></div>
+            <div id="compare-result" class="px-3.5 py-3 border border-line rounded-[7px] bg-wash grid grid-cols-[minmax(0,1fr)] gap-[5px] min-w-0 data-[match=yes]:bg-success-bg data-[match=yes]:border-success-line data-[match=yes]:text-success data-[match=no]:bg-error-bg data-[match=no]:border-error-line data-[match=no]:text-error" role="status" hidden></div>
           </section>
         </div>
-        <div id="hash-tab-history" class="lab-section" hidden>
-          <section class="panel lab-panel">
-            <div class="section-head flex flex-wrap items-center justify-between gap-3">
+        <div id="hash-tab-history" class="min-w-0" hidden>
+          <section class="{{ lab_panel }}">
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2>Historial de hashes</h2>
-                <p class="small muted">Registros ligeros guardados en SQLite local. No se almacenan copias de los archivos originales.</p>
+                <h2 class="{{ h2_cls }}">Historial de hashes</h2>
+                <p class="text-[0.875rem] text-muted mt-1">Registros ligeros guardados en SQLite local. No se almacenan copias de los archivos originales.</p>
               </div>
               <div class="flex flex-wrap gap-2">
-                <details class="exports">
-                  <summary class="button subtle">{{icon('download')}} Exportar</summary>
-                  <div id="hash-history-exports">
+                <details class="relative">
+                  <summary class="{{ btn_subtle }} list-none">{{icon('download')}} Exportar</summary>
+                  <div id="hash-history-exports" class="{{ export_menu }}">
                     <a href="/api/hashes/history/export/json">JSON</a>
                     <a href="/api/hashes/history/export/csv">CSV</a>
                   </div>
                 </details>
-                <button id="hash-history-clear" class="button subtle" type="button" disabled>Limpiar historial</button>
+                <button id="hash-history-clear" class="{{ btn_subtle }}" type="button" disabled>Limpiar historial</button>
               </div>
             </div>
-            <div class="table-controls hash-history-controls flex flex-wrap items-center gap-2">
-              <label class="search flex items-center gap-2">{{icon('search')}}<span class="sr-only">Buscar por nombre</span><input id="hash-history-search" type="search" placeholder="Buscar por nombre"></label>
+            <div class="p-0 flex flex-wrap items-center gap-2">
+              <label class="{{ search_cls }}">{{icon('search')}}<span class="sr-only">Buscar por nombre</span><input id="hash-history-search" class="min-w-0 w-[clamp(9rem,18vw,15rem)] max-[540px]:flex-1 max-[540px]:w-full text-ink bg-transparent border-0 outline-none placeholder:text-muted placeholder:opacity-100" type="search" placeholder="Buscar por nombre"></label>
               <label class="sr-only" for="hash-history-algo">Filtrar por algoritmo</label>
-              <select id="hash-history-algo">
+              <select id="hash-history-algo" class="{{ select_cls }}">
                 <option value="">Todos los algoritmos</option>
                 <option value="SHA-256">SHA-256</option>
                 <option value="SHA-512">SHA-512</option>
@@ -334,252 +366,252 @@
                 <option value="MD5">MD5</option>
               </select>
             </div>
-            <div id="hash-history-status" class="notice" role="status" hidden></div>
+            <div id="hash-history-status" class="{{ notice_cls }}" role="status" hidden></div>
             <input id="hash-verify-picker" type="file" hidden aria-label="Seleccionar archivo para verificar integridad">
-            <div id="hash-verify-banner" class="verify-banner" role="status" hidden></div>
-            <div id="hash-history-list"></div>
+            <div id="hash-verify-banner" class="px-3.5 py-3 border border-line rounded-[7px] bg-wash grid grid-cols-[minmax(0,1fr)] gap-[5px] min-w-0 data-[state=verified]:bg-success-bg data-[state=verified]:border-success-line data-[state=verified]:text-success data-[state=changed]:bg-error-bg data-[state=changed]:border-error-line data-[state=changed]:text-error data-[state=error]:bg-error-bg data-[state=error]:border-error-line data-[state=error]:text-error data-[state=warning]:bg-warning-bg data-[state=warning]:border-warning-line data-[state=warning]:text-warning" role="status" hidden></div>
+            <div id="hash-history-list" class="space-y-2"></div>
           </section>
         </div>
       </section>
-      <section id="page-manifests" hidden>
-        <header class="page-head">
-          <h1 tabindex="-1">Manifiestos de integridad</h1>
-          <p>Genera y verifica manifiestos JSON para conjuntos de archivos o carpetas locales.</p>
+      <section id="page-manifests" class="min-w-0 w-full mb-[clamp(28px,4vw,48px)]" hidden>
+        <header class="mb-[22px]">
+          <h1 class="{{ h1_cls }}" tabindex="-1">Manifiestos de integridad</h1>
+          <p class="mt-1.5 text-muted text-[0.95rem] max-w-[72ch]">Genera y verifica manifiestos JSON para conjuntos de archivos o carpetas locales.</p>
         </header>
-        <div class="subnav" role="tablist" aria-label="Operaciones de manifiestos">
-          <button type="button" role="tab" class="subnav-tab" data-manifest-tab="generate" aria-selected="true">Generar manifiesto</button>
-          <button type="button" role="tab" class="subnav-tab" data-manifest-tab="verify" aria-selected="false">Verificar manifiesto</button>
+        <div class="{{ subnav_cls }}" role="tablist" aria-label="Operaciones de manifiestos">
+          <button type="button" role="tab" class="{{ subnav_tab }}" data-manifest-tab="generate" aria-selected="true">Generar manifiesto</button>
+          <button type="button" role="tab" class="{{ subnav_tab }}" data-manifest-tab="verify" aria-selected="false">Verificar manifiesto</button>
         </div>
-        <div id="manifest-tab-generate" class="lab-section">
-          <section class="panel lab-panel">
-            <div class="lab-head">
-              <h2>Generar manifiesto JSON</h2>
-              <p class="small muted">Solo se guardan rutas relativas normalizadas, tamaños y hashes; nunca contenido ni rutas absolutas.</p>
+        <div id="manifest-tab-generate" class="min-w-0">
+          <section class="{{ lab_panel }}">
+            <div>
+              <h2 class="{{ h2_cls }} mb-[3px]">Generar manifiesto JSON</h2>
+              <p class="text-[0.875rem] text-muted">Solo se guardan rutas relativas normalizadas, tamaños y hashes; nunca contenido ni rutas absolutas.</p>
             </div>
-            <div class="compare-controls">
-              <label class="field-group">
-                <span class="small muted">Algoritmo</span>
-                <select id="manifest-gen-algo">
+            <div class="flex items-end flex-wrap gap-x-3 gap-y-2.5">
+              <label class="grid grid-cols-[minmax(0,1fr)] gap-[5px] min-w-0">
+                <span class="text-[0.875rem] text-muted">Algoritmo</span>
+                <select id="manifest-gen-algo" class="{{ select_cls }}">
                   <option value="SHA-256" selected>SHA-256 (predeterminado)</option>
                   <option value="SHA-512">SHA-512</option>
                   <option value="SHA-1">SHA-1 (heredado)</option>
                   <option value="MD5">MD5 (heredado)</option>
                 </select>
               </label>
-              <button id="manifest-pick-files" class="button subtle" type="button">{{icon('plus')}} Seleccionar archivos</button>
-              <button id="manifest-pick-folder" class="button subtle" type="button">{{icon('folder')}} Seleccionar carpeta</button>
-              <button id="manifest-gen-clear" class="button quiet" type="button" hidden>Vaciar</button>
+              <button id="manifest-pick-files" class="{{ btn_subtle }}" type="button">{{icon('plus')}} Seleccionar archivos</button>
+              <button id="manifest-pick-folder" class="{{ btn_subtle }}" type="button">{{icon('folder')}} Seleccionar carpeta</button>
+              <button id="manifest-gen-clear" class="{{ btn_quiet }}" type="button" hidden>Vaciar</button>
               <input id="manifest-files-input" type="file" multiple hidden aria-label="Seleccionar archivos para manifiesto">
               <input id="manifest-folder-input" type="file" webkitdirectory multiple hidden aria-label="Seleccionar carpeta para manifiesto">
             </div>
-            <div id="manifest-gen-legacy" class="notice" hidden></div>
-            <p id="manifest-gen-selection" class="small muted">Ningún archivo seleccionado todavía.</p>
-            <div id="manifest-gen-progress" class="progress-box panel" hidden>
-              <div class="flex justify-between gap-3"><strong id="manifest-gen-progress-title">Calculando hashes…</strong><span class="mono" id="manifest-gen-progress-count"></span></div>
-              <progress id="manifest-gen-bar" max="1" value="0" aria-label="Progreso de generación de manifiesto"></progress>
-              <p id="manifest-gen-current" class="small muted"></p>
+            <div id="manifest-gen-legacy" class="{{ notice_cls }}" hidden></div>
+            <p id="manifest-gen-selection" class="text-[0.875rem] text-muted">Ningún archivo seleccionado todavía.</p>
+            <div id="manifest-gen-progress" class="{{ panel_cls }} mt-3 py-[13px] px-4" hidden>
+              <div class="flex justify-between gap-3"><strong id="manifest-gen-progress-title">Calculando hashes…</strong><span class="font-mono" id="manifest-gen-progress-count"></span></div>
+              <progress id="manifest-gen-bar" class="block w-full my-2" max="1" value="0" aria-label="Progreso de generación de manifiesto"></progress>
+              <p id="manifest-gen-current" class="text-[0.875rem] text-muted"></p>
             </div>
-            <div class="lab-actions">
-              <span class="small muted">Esquema JSON v1 determinista y ordenado por ruta relativa.</span>
+            <div class="flex items-center justify-between flex-wrap gap-x-4 gap-y-2.5 pt-2.5 border-t border-line">
+              <span class="text-[0.875rem] text-muted">Esquema JSON v1 determinista y ordenado por ruta relativa.</span>
               <div class="flex flex-wrap gap-2">
-                <button id="manifest-gen-cancel" class="button subtle" type="button" hidden>Cancelar</button>
-                <button id="manifest-gen-run" class="button primary" type="button" disabled>{{icon('manifest')}} Generar manifiesto</button>
+                <button id="manifest-gen-cancel" class="{{ btn_subtle }}" type="button" hidden>Cancelar</button>
+                <button id="manifest-gen-run" class="{{ btn_primary }}" type="button" disabled>{{icon('manifest')}} Generar manifiesto</button>
               </div>
             </div>
-            <div id="manifest-gen-status" class="notice" role="status" hidden></div>
-            <div id="manifest-gen-output" hidden></div>
+            <div id="manifest-gen-status" class="{{ notice_cls }}" role="status" hidden></div>
+            <div id="manifest-gen-output" class="grid grid-cols-[minmax(0,1fr)] gap-3" hidden></div>
           </section>
         </div>
-        <div id="manifest-tab-verify" class="lab-section" hidden>
-          <section class="panel lab-panel">
-            <div class="lab-head">
-              <h2>Verificar conjunto contra manifiesto</h2>
-              <p class="small muted">Importa un manifiesto JSON y vuelve a seleccionar los archivos o la carpeta correspondiente.</p>
+        <div id="manifest-tab-verify" class="min-w-0" hidden>
+          <section class="{{ lab_panel }}">
+            <div>
+              <h2 class="{{ h2_cls }} mb-[3px]">Verificar conjunto contra manifiesto</h2>
+              <p class="text-[0.875rem] text-muted">Importa un manifiesto JSON y vuelve a seleccionar los archivos o la carpeta correspondiente.</p>
             </div>
-            <div class="verify-steps">
-              <div class="verify-step">
-                <strong class="small">1. Manifiesto de referencia (JSON)</strong>
+            <div class="grid grid-cols-[minmax(0,1fr)] gap-3">
+              <div class="grid grid-cols-[minmax(0,1fr)] gap-2 py-3 px-3.5 border border-line rounded-[7px] bg-wash min-w-0">
+                <strong class="text-[0.875rem]">1. Manifiesto de referencia (JSON)</strong>
                 <div class="flex flex-wrap items-center gap-2">
-                  <button id="manifest-import-btn" class="button subtle" type="button">{{icon('upload')}} Cargar manifiesto JSON</button>
+                  <button id="manifest-import-btn" class="{{ btn_subtle }}" type="button">{{icon('upload')}} Cargar manifiesto JSON</button>
                   <input id="manifest-import-input" type="file" accept=".json,application/json" hidden aria-label="Cargar archivo de manifiesto JSON">
-                  <span id="manifest-import-meta" class="small muted">Ningún manifiesto cargado.</span>
+                  <span id="manifest-import-meta" class="text-[0.875rem] text-muted">Ningún manifiesto cargado.</span>
                 </div>
               </div>
-              <div class="verify-step">
-                <strong class="small">2. Archivos a verificar</strong>
+              <div class="grid grid-cols-[minmax(0,1fr)] gap-2 py-3 px-3.5 border border-line rounded-[7px] bg-wash min-w-0">
+                <strong class="text-[0.875rem]">2. Archivos a verificar</strong>
                 <div class="flex flex-wrap items-center gap-2">
-                  <button id="manifest-ver-files-btn" class="button subtle" type="button">{{icon('plus')}} Seleccionar archivos</button>
-                  <button id="manifest-ver-folder-btn" class="button subtle" type="button">{{icon('folder')}} Seleccionar carpeta</button>
+                  <button id="manifest-ver-files-btn" class="{{ btn_subtle }}" type="button">{{icon('plus')}} Seleccionar archivos</button>
+                  <button id="manifest-ver-folder-btn" class="{{ btn_subtle }}" type="button">{{icon('folder')}} Seleccionar carpeta</button>
                   <input id="manifest-ver-files-input" type="file" multiple hidden aria-label="Seleccionar archivos a verificar">
                   <input id="manifest-ver-folder-input" type="file" webkitdirectory multiple hidden aria-label="Seleccionar carpeta a verificar">
-                  <span id="manifest-ver-selection" class="small muted">Ningún archivo seleccionado.</span>
+                  <span id="manifest-ver-selection" class="text-[0.875rem] text-muted">Ningún archivo seleccionado.</span>
                 </div>
               </div>
             </div>
-            <div id="manifest-ver-progress" class="progress-box panel" hidden>
-              <div class="flex justify-between gap-3"><strong id="manifest-ver-progress-title">Verificando archivos…</strong><span class="mono" id="manifest-ver-progress-count"></span></div>
-              <progress id="manifest-ver-bar" max="1" value="0" aria-label="Progreso de verificación de manifiesto"></progress>
-              <p id="manifest-ver-current" class="small muted"></p>
+            <div id="manifest-ver-progress" class="{{ panel_cls }} mt-3 py-[13px] px-4" hidden>
+              <div class="flex justify-between gap-3"><strong id="manifest-ver-progress-title">Verificando archivos…</strong><span class="font-mono" id="manifest-ver-progress-count"></span></div>
+              <progress id="manifest-ver-bar" class="block w-full my-2" max="1" value="0" aria-label="Progreso de verificación de manifiesto"></progress>
+              <p id="manifest-ver-current" class="text-[0.875rem] text-muted"></p>
             </div>
-            <div class="lab-actions">
-              <span class="small muted">Un manifiesto verifica integridad respecto al JSON, no autenticidad criptográfica.</span>
+            <div class="flex items-center justify-between flex-wrap gap-x-4 gap-y-2.5 pt-2.5 border-t border-line">
+              <span class="text-[0.875rem] text-muted">Un manifiesto verifica integridad respecto al JSON, no autenticidad criptográfica.</span>
               <div class="flex flex-wrap gap-2">
-                <button id="manifest-ver-cancel" class="button subtle" type="button" hidden>Cancelar</button>
-                <button id="manifest-ver-run" class="button primary" type="button" disabled>{{icon('check')}} Verificar integridad</button>
+                <button id="manifest-ver-cancel" class="{{ btn_subtle }}" type="button" hidden>Cancelar</button>
+                <button id="manifest-ver-run" class="{{ btn_primary }}" type="button" disabled>{{icon('check')}} Verificar integridad</button>
               </div>
             </div>
-            <div id="manifest-ver-status" class="notice" role="status" hidden></div>
-            <div id="manifest-ver-results" hidden></div>
+            <div id="manifest-ver-status" class="{{ notice_cls }}" role="status" hidden></div>
+            <div id="manifest-ver-results" class="grid grid-cols-[minmax(0,1fr)] gap-3" hidden></div>
           </section>
         </div>
       </section>
-      <section id="page-investigations" hidden>
-        <header class="page-head workspace-head">
+      <section id="page-investigations" class="min-w-0 w-full mb-[clamp(28px,4vw,48px)]" hidden>
+        <header class="mb-[22px] flex items-end justify-between flex-wrap gap-x-[18px] gap-y-3">
           <div>
-            <h1 tabindex="-1">Investigaciones</h1>
-            <p>Organiza expedientes persistentes con análisis, comparaciones, cronologías y paquetes portables.</p>
+            <h1 class="{{ h1_cls }}" tabindex="-1">Investigaciones</h1>
+            <p class="mt-1.5 text-muted text-[0.95rem] max-w-[72ch]">Organiza expedientes persistentes con análisis, comparaciones, cronologías y paquetes portables.</p>
           </div>
           <div class="flex flex-wrap gap-2">
-            <button id="inv-open-import" class="button subtle" type="button">{{icon('upload')}} Importar paquetes</button>
-            <button id="inv-open-create" class="button primary" type="button">{{icon('plus')}} Nueva investigación</button>
+            <button id="inv-open-import" class="{{ btn_subtle }}" type="button">{{icon('upload')}} Importar paquetes</button>
+            <button id="inv-open-create" class="{{ btn_primary }}" type="button">{{icon('plus')}} Nueva investigación</button>
           </div>
         </header>
 
-        <section id="inv-create-panel" class="panel lab-panel inv-drawer" hidden>
-          <div class="duel-section-head">
-            <h2>Crear nueva investigación</h2>
-            <button id="inv-create-cancel" class="button icon-button" type="button" aria-label="Cerrar formulario">{{icon('x')}}</button>
+        <section id="inv-create-panel" class="{{ lab_panel }} mb-4" hidden>
+          <div class="flex items-center justify-between flex-wrap gap-x-3 gap-y-2">
+            <h2 class="{{ h2_cls }}">Crear nueva investigación</h2>
+            <button id="inv-create-cancel" class="{{ btn_icon }}" type="button" aria-label="Cerrar formulario">{{icon('x')}}</button>
           </div>
-          <form id="inv-create-form" class="inv-form">
-            <div class="compare-grid">
-              <label class="field-group">
-                <span class="small"><strong>Nombre de la investigación *</strong></span>
-                <input id="inv-new-name" class="text-input" type="text" required maxlength="200" placeholder="Ej. Revisión de entregas del módulo 3">
+          <form id="inv-create-form" class="grid grid-cols-[minmax(0,1fr)] gap-3">
+            <div class="grid grid-cols-2 max-md:grid-cols-1 gap-3.5">
+              <label class="grid grid-cols-[minmax(0,1fr)] gap-[5px] min-w-0">
+                <span class="text-[0.875rem]"><strong>Nombre de la investigación *</strong></span>
+                <input id="inv-new-name" class="{{ input_cls }}" type="text" required maxlength="200" placeholder="Ej. Revisión de entregas del módulo 3">
               </label>
-              <label class="field-group">
-                <span class="small"><strong>Responsable (nombre completo) *</strong></span>
-                <input id="inv-new-responsible" class="text-input" type="text" required maxlength="160" placeholder="Ej. Dra. Elena Vargas">
+              <label class="grid grid-cols-[minmax(0,1fr)] gap-[5px] min-w-0">
+                <span class="text-[0.875rem]"><strong>Responsable (nombre completo) *</strong></span>
+                <input id="inv-new-responsible" class="{{ input_cls }}" type="text" required maxlength="160" placeholder="Ej. Dra. Elena Vargas">
               </label>
             </div>
-            <label class="field-group">
-              <span class="small muted">Descripción u objetivo (opcional)</span>
-              <textarea id="inv-new-description" class="hash-input" rows="2" maxlength="4000" placeholder="Alcance, propósito o contexto de la revisión"></textarea>
+            <label class="grid grid-cols-[minmax(0,1fr)] gap-[5px] min-w-0">
+              <span class="text-[0.875rem] text-muted">Descripción u objetivo (opcional)</span>
+              <textarea id="inv-new-description" class="{{ textarea_cls }}" rows="2" maxlength="4000" placeholder="Alcance, propósito o contexto de la revisión"></textarea>
             </label>
-            <div class="compare-grid">
-              <label class="field-group">
-                <span class="small muted">Tipo de investigación</span>
-                <select id="inv-new-kind">
+            <div class="grid grid-cols-2 max-md:grid-cols-1 gap-3.5">
+              <label class="grid grid-cols-[minmax(0,1fr)] gap-[5px] min-w-0">
+                <span class="text-[0.875rem] text-muted">Tipo de investigación</span>
+                <select id="inv-new-kind" class="{{ select_cls }}">
                   <option value="document_analysis" selected>Análisis documental</option>
                   <option value="integrity_verification">Verificación de integridad</option>
                   <option value="exploratory_forensic">Análisis forense exploratorio</option>
                 </select>
               </label>
-              <label class="field-group">
-                <span class="small muted">Clasificación (informativa)</span>
-                <select id="inv-new-classification">
+              <label class="grid grid-cols-[minmax(0,1fr)] gap-[5px] min-w-0">
+                <span class="text-[0.875rem] text-muted">Clasificación (informativa)</span>
+                <select id="inv-new-classification" class="{{ select_cls }}">
                   <option value="private" selected>Privada (informativa)</option>
                   <option value="confidential">Confidencial (informativa)</option>
                 </select>
               </label>
             </div>
-            <p class="small muted">Se asignará automáticamente un UUID único e inmutable y fechas UTC del reloj local. La clasificación es informativa y no aplica cifrado ni control de acceso.</p>
-            <div id="inv-create-error" class="notice" role="alert" hidden></div>
-            <div class="lab-actions">
-              <span class="small muted">* Campos obligatorios</span>
+            <p class="text-[0.875rem] text-muted">Se asignará automáticamente un UUID único e inmutable y fechas UTC del reloj local. La clasificación es informativa y no aplica cifrado ni control de acceso.</p>
+            <div id="inv-create-error" class="{{ notice_cls }}" role="alert" hidden></div>
+            <div class="flex items-center justify-between flex-wrap gap-x-4 gap-y-2.5 pt-2.5 border-t border-line">
+              <span class="text-[0.875rem] text-muted">* Campos obligatorios</span>
               <div class="flex flex-wrap gap-2">
-                <button id="inv-create-close" class="button quiet" type="button">Cancelar</button>
-                <button id="inv-create-submit" class="button primary" type="submit">{{icon('case')}} Crear expediente</button>
+                <button id="inv-create-close" class="{{ btn_quiet }}" type="button">Cancelar</button>
+                <button id="inv-create-submit" class="{{ btn_primary }}" type="submit">{{icon('case')}} Crear expediente</button>
               </div>
             </div>
           </form>
         </section>
 
-        <section id="inv-import-panel" class="panel lab-panel inv-drawer" hidden>
-          <div class="duel-section-head">
+        <section id="inv-import-panel" class="{{ lab_panel }} mb-4" hidden>
+          <div class="flex items-center justify-between flex-wrap gap-x-3 gap-y-2">
             <div>
-              <h2>Importar investigaciones (individual o masiva)</h2>
-              <p class="small muted">Selecciona uno o varios paquetes <code>.zip</code> exportados desde otras instalaciones. Se validan individualmente y se detectan conflictos por UUID.</p>
+              <h2 class="{{ h2_cls }}">Importar investigaciones (individual o masiva)</h2>
+              <p class="text-[0.875rem] text-muted">Selecciona uno o varios paquetes <code class="font-mono">.zip</code> exportados desde otras instalaciones. Se validan individualmente y se detectan conflictos por UUID.</p>
             </div>
-            <button id="inv-import-close" class="button icon-button" type="button" aria-label="Cerrar importación">{{icon('x')}}</button>
+            <button id="inv-import-close" class="{{ btn_icon }}" type="button" aria-label="Cerrar importación">{{icon('x')}}</button>
           </div>
           <div class="flex flex-wrap items-center gap-2">
-            <button id="inv-import-pick" class="button subtle" type="button">{{icon('upload')}} Seleccionar paquete(s) .zip</button>
+            <button id="inv-import-pick" class="{{ btn_subtle }}" type="button">{{icon('upload')}} Seleccionar paquete(s) .zip</button>
             <input id="inv-import-input" type="file" accept=".zip,application/zip" multiple hidden aria-label="Seleccionar paquetes de investigación">
-            <span id="inv-import-count" class="small muted">Ningún paquete seleccionado.</span>
+            <span id="inv-import-count" class="text-[0.875rem] text-muted">Ningún paquete seleccionado.</span>
           </div>
-          <div id="inv-import-status" class="notice" role="status" hidden></div>
-          <div id="inv-import-preview" hidden></div>
-          <div id="inv-import-results" hidden></div>
+          <div id="inv-import-status" class="{{ notice_cls }}" role="status" hidden></div>
+          <div id="inv-import-preview" class="grid grid-cols-[minmax(0,1fr)] gap-3" hidden></div>
+          <div id="inv-import-results" class="grid grid-cols-[minmax(0,1fr)] gap-3" hidden></div>
         </section>
 
-        <section class="panel table-panel">
-          <div class="table-controls flex flex-wrap items-center gap-2">
-            <h2 class="mr-auto small">Expedientes locales <span id="inv-list-count" class="muted"></span></h2>
-            <label class="search flex items-center gap-2">{{icon('search')}}<span class="sr-only">Buscar investigaciones</span><input id="inv-search" type="search" placeholder="Buscar nombre, responsable o UUID"></label>
+        <section class="{{ panel_cls }} mb-3.5">
+          <div class="py-3 px-3.5 flex flex-wrap items-center gap-2">
+            <h2 class="mr-auto text-[0.875rem] font-semibold max-[540px]:w-full">Expedientes locales <span id="inv-list-count" class="text-muted ml-[5px] font-normal text-[0.83rem]"></span></h2>
+            <label class="{{ search_cls }}">{{icon('search')}}<span class="sr-only">Buscar investigaciones</span><input id="inv-search" class="min-w-0 w-[clamp(9rem,18vw,15rem)] max-[540px]:flex-1 max-[540px]:w-full text-ink bg-transparent border-0 outline-none placeholder:text-muted placeholder:opacity-100" type="search" placeholder="Buscar nombre, responsable o UUID"></label>
             <label class="sr-only" for="inv-status-filter">Filtrar por estado</label>
-            <select id="inv-status-filter">
+            <select id="inv-status-filter" class="{{ select_cls }}">
               <option value="">Todos los estados</option>
               <option value="open">Abiertas</option>
               <option value="paused">Pausadas</option>
               <option value="closed">Cerradas</option>
             </select>
             <label class="sr-only" for="inv-sort">Ordenar investigaciones</label>
-            <select id="inv-sort">
+            <select id="inv-sort" class="{{ select_cls }}">
               <option value="updated_at" selected>Última actividad</option>
               <option value="created_at">Fecha de creación</option>
             </select>
           </div>
-          <div id="inv-list-message" class="notice" role="status" hidden></div>
-          <div id="inv-list" class="inv-list"></div>
+          <div id="inv-list-message" class="{{ notice_cls }}" role="status" hidden></div>
+          <div id="inv-list" class="grid grid-cols-[minmax(0,1fr)]"></div>
         </section>
       </section>
 
-      <section id="page-investigation" class="workbench" aria-labelledby="inv-detail-title" hidden>
-        <a href="#investigations" class="return-link">{{icon('back')}} Volver a investigaciones</a>
-        <header id="inv-detail-header" class="workbench-head inv-workbench-head"></header>
-        <div id="inv-detail-notice" class="notice" role="status" hidden></div>
-        <div id="inv-detail-action-drawer" class="panel lab-panel inv-drawer" hidden></div>
-        <div id="inv-tabs" class="subnav" role="tablist" aria-label="Secciones de la investigación">
-          <button type="button" role="tab" class="subnav-tab" data-inv-tab="summary" aria-selected="true">Resumen</button>
-          <button type="button" role="tab" class="subnav-tab" data-inv-tab="files" aria-selected="false">Archivos</button>
-          <button type="button" role="tab" class="subnav-tab" data-inv-tab="comparisons" aria-selected="false">Comparaciones</button>
-          <button type="button" role="tab" class="subnav-tab" data-inv-tab="timeline" aria-selected="false">Línea de tiempo</button>
-          <button type="button" role="tab" class="subnav-tab" data-inv-tab="notes" aria-selected="false">Observaciones</button>
-          <button type="button" role="tab" class="subnav-tab" data-inv-tab="reports" aria-selected="false">Informes</button>
+      <section id="page-investigation" class="min-w-0 w-full mb-[clamp(28px,4vw,48px)]" aria-labelledby="inv-detail-title" hidden>
+        <a href="#investigations" class="{{ return_link }}">{{icon('back')}} Volver a investigaciones</a>
+        <header id="inv-detail-header" class="flex items-center max-[540px]:items-start flex-wrap justify-between gap-3.5 pb-4 border-b border-line mb-4 min-w-0"></header>
+        <div id="inv-detail-notice" class="{{ notice_cls }} mb-3" role="status" hidden></div>
+        <div id="inv-detail-action-drawer" class="{{ lab_panel }} mb-4" hidden></div>
+        <div id="inv-tabs" class="{{ subnav_cls }}" role="tablist" aria-label="Secciones de la investigación">
+          <button type="button" role="tab" class="{{ subnav_tab }}" data-inv-tab="summary" aria-selected="true">Resumen</button>
+          <button type="button" role="tab" class="{{ subnav_tab }}" data-inv-tab="files" aria-selected="false">Archivos</button>
+          <button type="button" role="tab" class="{{ subnav_tab }}" data-inv-tab="comparisons" aria-selected="false">Comparaciones</button>
+          <button type="button" role="tab" class="{{ subnav_tab }}" data-inv-tab="timeline" aria-selected="false">Línea de tiempo</button>
+          <button type="button" role="tab" class="{{ subnav_tab }}" data-inv-tab="notes" aria-selected="false">Observaciones</button>
+          <button type="button" role="tab" class="{{ subnav_tab }}" data-inv-tab="reports" aria-selected="false">Informes</button>
         </div>
-        <div id="inv-tab-outlet" class="inspection-body"></div>
+        <div id="inv-tab-outlet" class="min-w-0"></div>
       </section>
 
-      <section id="page-detail" class="workbench" aria-labelledby="detail-title" hidden>
-        <a href="#workspace" class="return-link" data-return>{{icon('back')}} Volver a resultados</a>
-        <header class="workbench-head">
-          <span class="file-mark">{{icon('file')}}</span>
-          <div>
-            <p class="small muted">Inspector de archivo</p>
-            <h1 id="detail-title" tabindex="-1">Inspector de archivo</h1>
+      <section id="page-detail" class="min-w-0 w-full mb-[clamp(28px,4vw,48px)]" aria-labelledby="detail-title" hidden>
+        <a href="#workspace" class="{{ return_link }}" data-return>{{icon('back')}} Volver a resultados</a>
+        <header class="flex items-center max-[540px]:items-start gap-3.5 pb-4 border-b border-line mb-4 min-w-0">
+          <span class="grid place-items-center flex-none size-[46px] max-[540px]:size-10 text-accent bg-tint border border-tint-line rounded-[9px] [&_svg]:size-[22px]">{{icon('file')}}</span>
+          <div class="min-w-0">
+            <p class="text-[0.875rem] text-muted my-[3px]">Inspector de archivo</p>
+            <h1 id="detail-title" class="font-bold tracking-[-0.04em] leading-[1.14] text-[clamp(1.5rem,2.8vw,2.25rem)] break-words" tabindex="-1">Inspector de archivo</h1>
           </div>
         </header>
         <div id="detail-summary"></div>
-        <div id="detail-body" class="inspection-body"></div>
+        <div id="detail-body" class="min-w-0"></div>
       </section>
-      <section id="page-duel" class="workbench" aria-labelledby="duel-title" hidden>
-        <a href="#workspace" class="return-link" data-return>{{icon('back')}} Volver a resultados</a>
-        <header class="workbench-head">
-          <span class="file-mark">{{icon('compare')}}</span>
-          <div><h1 id="duel-title" tabindex="-1">Duelo de documentos</h1><p class="muted">Compara los campos registrados de dos archivos de la misma sesión.</p></div>
+      <section id="page-duel" class="min-w-0 w-full mb-[clamp(28px,4vw,48px)]" aria-labelledby="duel-title" hidden>
+        <a href="#workspace" class="{{ return_link }}" data-return>{{icon('back')}} Volver a resultados</a>
+        <header class="flex items-center max-[540px]:items-start gap-3.5 pb-4 border-b border-line mb-4 min-w-0">
+          <span class="grid place-items-center flex-none size-[46px] max-[540px]:size-10 text-accent bg-tint border border-tint-line rounded-[9px] [&_svg]:size-[22px]">{{icon('compare')}}</span>
+          <div class="min-w-0"><h1 id="duel-title" class="font-bold tracking-[-0.04em] leading-[1.14] text-[clamp(1.5rem,2.8vw,2.25rem)] break-words" tabindex="-1">Duelo de documentos</h1><p class="text-muted my-[3px]">Compara los campos registrados de dos archivos de la misma sesión.</p></div>
         </header>
-        <div id="duel-body" class="inspection-body duel-body"></div>
+        <div id="duel-body" class="min-w-0 space-y-3"></div>
       </section>
-      <footer class="workspace-foot">
-        <span>La Orca · Inspector local de metadatos</span><a href="#guide">Límites y limpieza de metadatos</a>
+      <footer class="mt-auto flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 py-4 border-t border-line text-muted text-[0.8rem]">
+        <span>La Orca · Inspector local de metadatos</span><a href="#guide" class="hover:text-accent hover:underline">Límites y limpieza de metadatos</a>
       </footer>
 </main>
   </div>
 </div>
-<dialog id="confirm" aria-labelledby="confirm-title">
-  <div class="dialog-head"><h2 id="confirm-title">Eliminar datos locales</h2></div>
-  <div class="dialog-body"><p id="confirm-text"></p>
-    <form method="dialog" class="flex justify-end gap-2"><button class="button subtle" value="cancel" autofocus>Cancelar</button><button class="button danger" value="delete">Eliminar</button></form>
+<dialog id="confirm" class="w-[min(460px,calc(100vw-32px))] max-h-[90svh] m-auto border border-line-strong rounded-[10px] bg-surface text-ink p-0" aria-labelledby="confirm-title">
+  <div class="border-b border-line py-[13px] px-4"><h2 id="confirm-title" class="{{ h2_cls }}">Eliminar datos locales</h2></div>
+  <div class="pt-3.5 px-4 pb-4"><p id="confirm-text"></p>
+    <form method="dialog" class="mt-3.5 flex justify-end gap-2"><button class="{{ btn_subtle }}" value="cancel" autofocus>Cancelar</button><button class="{{ btn_danger }}" value="delete">Eliminar</button></form>
   </div>
 </dialog>
 </body>

@@ -22,6 +22,90 @@ const state = {
   inspection: null, historyVersion: 0, selected: [], route: 0, page: null, returnFocus: null,
 };
 
+const UI = {
+  btn: {
+    primary: "primary inline-flex items-center justify-center gap-[7px] min-h-[36px] px-3 py-[7px] border border-accent rounded-md font-semibold text-[0.86rem] leading-[1.25] text-center whitespace-nowrap shrink-0 break-normal no-underline text-on-accent bg-accent hover:not-disabled:bg-accent-hover hover:not-disabled:border-accent-hover [&_svg]:size-4 disabled:text-muted disabled:bg-wash disabled:border-line disabled:opacity-78",
+    "accent-button": "inline-flex items-center justify-center gap-[7px] min-h-[36px] px-3 py-[7px] border border-tint-line rounded-md font-semibold text-[0.86rem] leading-[1.25] text-center whitespace-nowrap shrink-0 break-normal no-underline text-accent bg-tint hover:not-disabled:border-accent [&_svg]:size-4 disabled:text-muted disabled:bg-wash disabled:border-line disabled:opacity-78",
+    subtle: "inline-flex items-center justify-center gap-[7px] min-h-[36px] px-3 py-[7px] border border-line rounded-md font-semibold text-[0.86rem] leading-[1.25] text-center whitespace-nowrap shrink-0 break-normal no-underline text-ink bg-surface hover:not-disabled:bg-wash hover:not-disabled:border-line-strong [&_svg]:size-4 disabled:text-muted disabled:bg-wash disabled:border-line disabled:opacity-78",
+    quiet: "inline-flex items-center justify-center gap-[7px] min-h-[36px] px-3 py-[7px] border border-transparent rounded-md font-semibold text-[0.86rem] leading-[1.25] text-center whitespace-nowrap shrink-0 break-normal no-underline text-muted bg-transparent hover:not-disabled:bg-wash hover:not-disabled:border-line-strong [&_svg]:size-4 disabled:text-muted disabled:bg-wash disabled:border-line disabled:opacity-78",
+    danger: "inline-flex items-center justify-center gap-[7px] min-h-[36px] px-3 py-[7px] border border-danger rounded-md font-semibold text-[0.86rem] leading-[1.25] text-center whitespace-nowrap shrink-0 break-normal no-underline text-on-danger bg-danger hover:not-disabled:bg-danger-hover [&_svg]:size-4 disabled:text-muted disabled:bg-wash disabled:border-line disabled:opacity-78",
+    "icon-button": "inline-flex items-center justify-center gap-[7px] min-h-[35px] min-w-[35px] p-[7px] border border-line rounded-md font-semibold text-[0.86rem] leading-[1.25] text-center whitespace-nowrap flex-none no-underline text-ink bg-surface hover:not-disabled:bg-wash hover:not-disabled:border-line-strong [&_svg]:size-4 disabled:text-muted disabled:bg-wash disabled:border-line disabled:opacity-78",
+    "primary small-btn": "primary inline-flex items-center justify-center gap-[7px] min-h-[30px] px-[9px] py-1 border border-accent rounded-md font-semibold text-[0.8rem] leading-[1.25] text-center whitespace-nowrap shrink-0 break-normal no-underline text-on-accent bg-accent hover:not-disabled:bg-accent-hover hover:not-disabled:border-accent-hover [&_svg]:size-4 disabled:text-muted disabled:bg-wash disabled:border-line disabled:opacity-78",
+    "accent-button small-btn": "inline-flex items-center justify-center gap-[7px] min-h-[30px] px-[9px] py-1 border border-tint-line rounded-md font-semibold text-[0.8rem] leading-[1.25] text-center whitespace-nowrap shrink-0 break-normal no-underline text-accent bg-tint hover:not-disabled:border-accent [&_svg]:size-4 disabled:text-muted disabled:bg-wash disabled:border-line disabled:opacity-78",
+    "subtle small-btn": "inline-flex items-center justify-center gap-[7px] min-h-[30px] px-[9px] py-1 border border-line rounded-md font-semibold text-[0.8rem] leading-[1.25] text-center whitespace-nowrap shrink-0 break-normal no-underline text-ink bg-surface hover:not-disabled:bg-wash hover:not-disabled:border-line-strong [&_svg]:size-4 disabled:text-muted disabled:bg-wash disabled:border-line disabled:opacity-78",
+    "quiet small-btn": "inline-flex items-center justify-center gap-[7px] min-h-[30px] px-[9px] py-1 border border-transparent rounded-md font-semibold text-[0.8rem] leading-[1.25] text-center whitespace-nowrap shrink-0 break-normal no-underline text-muted bg-transparent hover:not-disabled:bg-wash hover:not-disabled:border-line-strong [&_svg]:size-4 disabled:text-muted disabled:bg-wash disabled:border-line disabled:opacity-78",
+    "file-link": "inline-flex items-center gap-2 min-w-0 max-w-full text-left font-semibold text-ink no-underline hover:text-accent hover:underline [&_svg]:size-4 [&_svg]:text-accent [&_svg]:flex-none",
+    "sidebar-tool": "flex items-center justify-start gap-3 w-full min-h-[40px] px-3 border border-transparent rounded-[7px] bg-transparent text-muted text-[0.88rem] font-semibold text-left whitespace-nowrap overflow-hidden no-underline hover:bg-wash hover:text-ink aria-[current=page]:text-accent aria-[current=page]:bg-tint aria-[current=page]:border-tint-line aria-[pressed=true]:text-accent aria-[pressed=true]:bg-tint aria-[pressed=true]:border-tint-line",
+    "subnav-tab": "min-h-[34px] px-[13px] py-1.5 border border-transparent rounded-md text-muted text-[0.86rem] font-semibold bg-transparent whitespace-nowrap hover:text-ink aria-[selected=true]:text-accent aria-[selected=true]:bg-surface aria-[selected=true]:border-tint-line max-[540px]:flex-auto max-[540px]:text-center max-[540px]:px-[9px] max-[540px]:text-[0.82rem]",
+    "matrix-btn": "inline-flex items-center justify-center w-full min-h-[31px] py-1 px-2 text-[0.78rem] font-semibold tabular-nums rounded-md border border-line bg-surface text-ink whitespace-nowrap data-[matrix-state=identical]:bg-success-bg data-[matrix-state=identical]:border-success-line data-[matrix-state=identical]:text-success data-[matrix-state=high]:bg-tint data-[matrix-state=high]:border-tint-line data-[matrix-state=high]:text-accent data-[matrix-state=mid]:bg-warning-bg data-[matrix-state=mid]:border-warning-line data-[matrix-state=mid]:text-warning data-[matrix-state=pending]:bg-wash data-[matrix-state=pending]:text-muted data-[matrix-state=binary]:bg-surface data-[matrix-state=binary]:text-muted disabled:opacity-60",
+  },
+  sidebarLabel: "opacity-0 invisible pointer-events-none whitespace-nowrap transition-[opacity,visibility] duration-150 ease-out group-hover/sidebar:opacity-100 group-hover/sidebar:visible group-hover/sidebar:pointer-events-auto group-hover/sidebar:delay-[40ms] group-focus-within/sidebar:opacity-100 group-focus-within/sidebar:visible group-focus-within/sidebar:pointer-events-auto group-has-[[data-pinned=true]]/sidebar:opacity-100 group-has-[[data-pinned=true]]/sidebar:visible group-has-[[data-pinned=true]]/sidebar:pointer-events-auto",
+  panel: "border border-line rounded-[10px] bg-surface min-w-0",
+  labPanel: "border border-line rounded-[10px] bg-surface min-w-0 p-[18px_20px] max-[540px]:p-[13px] grid grid-cols-[minmax(0,1fr)] gap-3.5",
+  duelSection: "border border-line rounded-[10px] bg-surface min-w-0 p-[16px_18px] max-[540px]:p-[13px] grid grid-cols-[minmax(0,1fr)] gap-3",
+  notice: "px-[13px] py-2.5 border border-warning-line rounded-[7px] bg-warning-bg text-warning break-words text-[0.88rem] leading-[1.45] data-[error=true]:text-error data-[error=true]:bg-error-bg data-[error=true]:border-error-line",
+  callout: "py-3 px-3.5 border border-tint-line border-s-[3px] border-s-accent rounded-[7px] bg-tint grid grid-cols-[minmax(0,1fr)] gap-1.5",
+  banner: "px-3.5 py-3 border border-line rounded-[7px] bg-wash grid grid-cols-[minmax(0,1fr)] gap-[5px] min-w-0 data-[state=verified]:bg-success-bg data-[state=verified]:border-success-line data-[state=verified]:text-success data-[state=changed]:bg-error-bg data-[state=changed]:border-error-line data-[state=changed]:text-error data-[state=error]:bg-error-bg data-[state=error]:border-error-line data-[state=error]:text-error data-[state=warning]:bg-warning-bg data-[state=warning]:border-warning-line data-[state=warning]:text-warning",
+  status: "inline-flex items-center gap-[5px] w-fit max-w-full py-[3px] px-2 rounded-[5px] border border-line bg-wash text-muted text-[0.78rem] font-semibold leading-[1.25] whitespace-nowrap shrink-0 break-normal data-[status=ok]:text-success data-[status=ok]:border-success-line data-[status=ok]:bg-success-bg data-[diff=matching]:text-success data-[diff=matching]:border-success-line data-[diff=matching]:bg-success-bg data-[status=unsupported]:text-warning data-[status=unsupported]:border-warning-line data-[status=unsupported]:bg-warning-bg data-[diff=different]:text-warning data-[diff=different]:border-warning-line data-[diff=different]:bg-warning-bg data-[level=potential]:text-warning data-[level=potential]:border-warning-line data-[level=potential]:bg-warning-bg data-[status=error]:text-error data-[status=error]:border-error-line data-[status=error]:bg-error-bg",
+  stats: "flex flex-wrap gap-2 items-center min-w-0",
+  stat: "inline-flex items-baseline gap-[7px] py-1.5 px-3 max-[540px]:py-[5px] max-[540px]:px-[9px] border border-line rounded-[7px] bg-wash text-[0.85rem] max-[540px]:text-[0.8rem] text-muted whitespace-nowrap [&_strong]:text-ink [&_strong]:text-[0.95rem] [&_strong]:font-bold [&_strong]:tabular-nums",
+  select: "min-h-[36px] px-[9px] py-[5px] border border-line-strong rounded-md bg-surface text-ink text-[0.86rem] max-w-full",
+  input: "min-h-[36px] w-full px-2.5 py-1.5 border border-line-strong rounded-md bg-surface text-ink text-[0.88rem] focus:border-accent",
+  textarea: "w-full min-h-[62px] px-2.5 py-2 border border-line-strong rounded-md bg-surface text-ink text-[0.85rem] resize-y wrap-anywhere focus:border-accent",
+  check: "inline-flex items-center gap-2 text-muted text-[0.875rem] min-w-0 [&_input]:flex-none [&_input]:size-[17px]",
+  fieldGroup: "grid grid-cols-[minmax(0,1fr)] gap-[5px] min-w-0",
+  compareGrid: "grid grid-cols-2 max-md:grid-cols-1 gap-3.5",
+  labActions: "flex items-center justify-between flex-wrap gap-x-4 gap-y-2.5 pt-2.5 border-t border-line",
+  scrollTable: "w-full max-w-full overflow-x-auto",
+  table: "border-collapse w-full text-[0.865rem] text-left",
+  th: "px-3 py-2.5 border-t border-line bg-wash text-muted font-semibold text-[0.82rem] whitespace-nowrap align-middle",
+  td: "px-3 py-2.5 border-t border-line align-middle break-words",
+  tdNum: "px-3 py-2.5 border-t border-line align-middle text-right tabular-nums whitespace-nowrap",
+  tdStatus: "px-3 py-2.5 border-t border-line align-middle whitespace-nowrap w-[1%]",
+  tdActions: "px-3 py-2.5 border-t border-line align-middle whitespace-nowrap w-[1%] text-right",
+  tdName: "px-3 py-2.5 border-t border-line align-middle min-w-[200px] max-w-[310px]",
+  tdData: "px-3 py-2.5 border-t border-line align-middle min-w-[100px] max-w-[185px] break-words",
+  tdDate: "px-3 py-2.5 border-t border-line align-middle min-w-[130px] max-w-[185px] break-words",
+  tr: "hover:bg-wash data-[selected=true]:bg-wash",
+  truncate: "block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
+  details: "border border-line rounded-[7px] py-[9px] px-3 min-w-0 open:[&>*+*]:mt-2",
+  summary: "font-semibold break-words",
+  pre: "max-h-[540px] whitespace-pre-wrap overflow-auto wrap-anywhere bg-wash border border-line p-3 rounded-md text-[0.83rem] font-mono",
+  code: "font-mono text-muted text-[0.82rem] wrap-anywhere",
+  hashCode: "block w-full max-w-full py-2 px-2.5 border border-line rounded-md bg-surface text-ink text-[0.81rem] font-mono break-all",
+  hashInline: "block max-w-[220px] text-[0.78rem] font-mono overflow-hidden text-ellipsis whitespace-nowrap",
+  dlRow: "grid grid-cols-[minmax(110px,0.75fr)_minmax(0,2fr)] max-[540px]:grid-cols-1 gap-x-3 gap-y-1 py-2 border-b border-line last:border-b-0 text-[0.885rem]",
+  dt: "text-muted wrap-anywhere",
+  dd: "min-w-0 wrap-anywhere",
+  fileLink: "inline-flex items-center gap-2 min-w-0 max-w-full text-left font-semibold text-ink no-underline hover:text-accent hover:underline [&_svg]:size-4 [&_svg]:text-accent [&_svg]:flex-none",
+  fileMark: "grid place-items-center flex-none size-[46px] max-[540px]:size-10 text-accent bg-tint border border-tint-line rounded-[9px] [&_svg]:size-[22px]",
+  h2: "text-[1.24rem] font-semibold leading-[1.25] tracking-[-0.02em]",
+  h3: "text-base font-semibold leading-[1.3]",
+  small: "text-[0.875rem]",
+  smallMuted: "text-[0.875rem] text-muted",
+  muted: "text-muted",
+  errorText: "text-[0.875rem] text-error",
+  empty: "min-h-[155px] grid grid-cols-[minmax(0,1fr)] content-center justify-items-center gap-[7px] p-[18px] text-center",
+  emptyIcon: "grid place-items-center w-10 h-[38px] rounded-lg border border-line bg-wash text-muted",
+  tableEmpty: "py-[26px] px-3.5 text-center text-muted text-[0.875rem]",
+  duelHead: "flex items-center justify-between flex-wrap gap-x-3 gap-y-2",
+  duelFilters: "flex flex-wrap items-center gap-2",
+  duelNotes: "list-disc ps-[18px] grid gap-[3px]",
+  finding: "py-2.5 border-b border-line last:border-b-0 break-words",
+  metaVal: "block whitespace-pre-wrap break-words",
+  metaItem: "min-w-0 space-y-1",
+  longValue: "bg-wash py-1 px-2 rounded-[5px] [&>summary]:text-accent [&>summary]:text-[0.84rem] [&>summary]:font-medium",
+  timeEvents: "list-none border-l border-tint-line pl-4 my-2.5 ml-1.5 mb-0.5",
+  timeEvent: "time-event relative pb-3.5 min-w-0",
+  timeEventTitle: "flex flex-wrap gap-x-2.5 gap-y-1 items-baseline",
+  subnav: "inline-flex flex-wrap gap-1 p-1 mb-4 border border-line rounded-lg bg-wash max-w-full max-[540px]:w-full",
+  cardRow: "py-3 px-3.5 border border-line rounded-lg bg-wash grid grid-cols-[minmax(0,1fr)] gap-2 min-w-0",
+  cardTop: "flex items-center justify-between flex-wrap gap-x-3 gap-y-2 min-w-0",
+  verifyStep: "grid grid-cols-[minmax(0,1fr)] gap-2 py-3 px-3.5 border border-line rounded-[7px] bg-wash min-w-0",
+  slideDiffBody: "grid grid-cols-[minmax(0,1fr)] gap-2 pt-1.5",
+  copyFeedback: "text-[0.875rem] text-muted empty:hidden",
+};
+
 function element(tag, className, ...children) {
   const result = document.createElement(tag);
   if (className) result.className = className;
@@ -30,14 +114,15 @@ function element(tag, className, ...children) {
 }
 
 function button(text, handler, style = "subtle") {
-  const result = element("button", "button " + style, text);
+  const result = element("button", UI.btn[style] ?? style, text);
   result.type = "button";
   result.addEventListener("click", handler);
   return result;
 }
 
 function link(text, href, style) {
-  const result = element("a", style, text);
+  const mapped = style?.startsWith("button ") ? UI.btn[style.slice(7)] : (UI.btn[style] ?? style);
+  const result = element("a", mapped, text);
   result.href = href;
   return result;
 }
@@ -128,9 +213,9 @@ function setTopbarContext(text) {
   node.title = text;
 }
 
-function truncatedCell(value, className = "table-data") {
+function truncatedCell(value, className = UI.tdData) {
   const text = display(value);
-  const span = element("span", "truncate-cell", text);
+  const span = element("span", UI.truncate, text);
   if (text !== "—") span.title = text;
   return element("td", className, span);
 }
@@ -206,7 +291,7 @@ async function updatePage(presentation = {}) {
     $("detail-summary").replaceChildren();
   }
   body.setAttribute("aria-busy", "true");
-  body.replaceChildren(element("p", "view-loading muted", "Leyendo los metadatos guardados…"));
+  body.replaceChildren(element("p", UI.muted, "Leyendo los metadatos guardados…"));
   if (!presentation.focusSwap) focusHeading(current);
   try {
     const session = state.session?.id === sessionId ? state.session : await api(sessionPath(sessionId));
@@ -227,7 +312,7 @@ async function updatePage(presentation = {}) {
     }
   } catch (error) {
     if (state.route === route) {
-      const notice = element("p", "notice", error.message);
+      const notice = element("p", UI.notice, error.message);
       notice.dataset.error = "true";
       notice.setAttribute("role", "alert");
       body.replaceChildren(notice);
@@ -268,7 +353,7 @@ function renderIntakeContext(progressInfo = null) {
   if (state.working) {
     titleNode.textContent = "Análisis en curso";
     const info = progressInfo || {title: "Cargando y validando archivos", processed: null, total: null, current: ""};
-    const bar = element("progress", "");
+    const bar = element("progress", "block w-full my-2");
     bar.setAttribute("aria-label", "Progreso real del análisis");
     if (typeof info.processed === "number" && typeof info.total === "number" && info.total > 0) {
       bar.max = info.total;
@@ -277,15 +362,16 @@ function renderIntakeContext(progressInfo = null) {
     const countText = (typeof info.processed === "number" && typeof info.total === "number")
       ? numbers.format(info.processed) + " / " + numbers.format(info.total) + " archivo(s)"
       : "Preparando lote…";
-    const card = element("div", "context-progress",
+    const card = element("div", "grid grid-cols-[minmax(0,1fr)] gap-2 p-3 border border-line rounded-lg bg-wash",
       element("div", "flex items-center justify-between gap-2 flex-wrap",
-        element("strong", "small", info.title),
-        element("span", "mono small muted", countText)),
+        element("strong", UI.small, info.title),
+        element("span", "font-mono text-[0.875rem] text-muted", countText)),
       bar,
-      element("p", "small muted truncate-cell", info.current || "Esperando respuesta del motor local…"));
+      element("p", "text-[0.875rem] text-muted block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
+        info.current || "Esperando respuesta del motor local…"));
     body.replaceChildren(
       card,
-      element("p", "small muted", "El procesamiento ocurre de forma local con ExifTool. Los archivos originales permanecen en tu equipo."));
+      element("p", UI.smallMuted, "El procesamiento ocurre de forma local con ExifTool. Los archivos originales permanecen en tu equipo."));
     return;
   }
 
@@ -299,25 +385,25 @@ function renderIntakeContext(progressInfo = null) {
       const fmt = extFormatMap[ext] || "Otro";
       counts.set(fmt, (counts.get(fmt) || 0) + 1);
     }
-    const stats = element("div", "stats",
-      element("div", "stat", element("strong", "", numbers.format(state.files.length)), element("span", "", state.files.length === 1 ? "Archivo" : "Archivos")),
-      element("div", "stat", element("strong", "", formatBytes(totalBytes)), element("span", "", "Tamaño total")));
+    const stats = element("div", UI.stats,
+      element("div", UI.stat, element("strong", "", numbers.format(state.files.length)), element("span", "", state.files.length === 1 ? "Archivo" : "Archivos")),
+      element("div", UI.stat, element("strong", "", formatBytes(totalBytes)), element("span", "", "Tamaño total")));
 
-    const formatChips = element("div", "context-formats",
+    const formatChips = element("div", "flex flex-wrap gap-1.5",
       ...Array.from(counts.entries()).map(([fmt, count]) =>
-        element("span", "status", fmt + " (" + numbers.format(count) + ")")));
+        element("span", UI.status, fmt + " (" + numbers.format(count) + ")")));
 
     const saveHint = $("keep").checked
       ? "Los resultados se guardarán en el historial SQLite local (sin copias permanentes de los originales)."
       : "Sesión temporal: los archivos y copias caducan automáticamente al cerrar o vencer la retención.";
 
     body.replaceChildren(
-      element("div", "slide-diff-body",
+      element("div", UI.slideDiffBody,
         stats,
-        element("div", "field-group",
-          element("span", "small muted", "Formatos por extensión (se confirmarán por firma binaria):"),
+        element("div", UI.fieldGroup,
+          element("span", UI.smallMuted, "Formatos por extensión (se confirmarán por firma binaria):"),
           formatChips)),
-      element("p", "small muted", saveHint));
+      element("p", UI.smallMuted, saveHint));
     return;
   }
 
@@ -325,12 +411,12 @@ function renderIntakeContext(progressInfo = null) {
   if (state.session) {
     titleNode.textContent = "Última sesión analizada";
     const s = state.session.summary;
-    const stats = element("div", "stats",
-      element("div", "stat", element("strong", "", numbers.format(s.count)), element("span", "", "Archivos")),
-      element("div", "stat", element("strong", "", numbers.format(s.properties)), element("span", "", "Propiedades")),
-      element("div", "stat", element("strong", "", numbers.format(s.findings)), element("span", "", "Hallazgos")),
-      element("div", "stat", element("strong", "", numbers.format(s.statuses.error)), element("span", "", "Errores")));
-    const actions = element("div", "context-links");
+    const stats = element("div", UI.stats,
+      element("div", UI.stat, element("strong", "", numbers.format(s.count)), element("span", "", "Archivos")),
+      element("div", UI.stat, element("strong", "", numbers.format(s.properties)), element("span", "", "Propiedades")),
+      element("div", UI.stat, element("strong", "", numbers.format(s.findings)), element("span", "", "Hallazgos")),
+      element("div", UI.stat, element("strong", "", numbers.format(s.statuses.error)), element("span", "", "Errores")));
+    const actions = element("div", "flex flex-wrap gap-2 pt-3 border-t border-line");
     if (state.session.files.length >= 2) {
       actions.append(link("Abrir Duelo", "#duel", "button accent-button small-btn"));
     }
@@ -339,9 +425,9 @@ function renderIntakeContext(progressInfo = null) {
       link("Laboratorio de hashes", "#hashes", "button subtle small-btn"),
       link("Manifiestos", "#manifests", "button subtle small-btn"));
     body.replaceChildren(
-      element("div", "slide-diff-body",
+      element("div", UI.slideDiffBody,
         stats,
-        element("p", "small muted",
+        element("p", UI.smallMuted,
           "Consulta los resultados en la tabla inferior o selecciona nuevos archivos a la izquierda para iniciar otro análisis.")),
       actions);
     return;
@@ -349,17 +435,21 @@ function renderIntakeContext(progressInfo = null) {
 
   // 4. Initial empty state: concise 3-step quick guide
   titleNode.textContent = "Cómo empezar";
-  const steps = element("ol", "context-steps",
-    element("li", "", element("span", "step-num", "1"),
-      element("div", "", element("strong", "", "Selecciona o arrastra archivos"),
-        element("p", "", "Admite PDF, Office, imágenes y paquetes ZIP directamente desde tu equipo."))),
-    element("li", "", element("span", "step-num", "2"),
-      element("div", "", element("strong", "", "Ejecuta el análisis local"),
-        element("p", "", "Extrae metadatos con ExifTool, calcula SHA-256 y detecta exposiciones sin conexión."))),
-    element("li", "", element("span", "step-num", "3"),
-      element("div", "", element("strong", "", "Inspecciona, compara o limpia"),
-        element("p", "", "Revisa detalles, cronología, compara dos documentos o genera una copia saneada verificada."))));
-  const links = element("div", "context-links",
+  const stepNumCls = "grid place-items-center size-[26px] rounded-full bg-tint border border-tint-line text-accent text-[0.8rem] font-bold tabular-nums";
+  const stepItemCls = "grid grid-cols-[26px_minmax(0,1fr)] gap-2.5 items-start";
+  const stepTitleCls = "block text-[0.9rem] font-semibold text-ink";
+  const stepDescCls = "mt-0.5 text-[0.84rem] text-muted leading-[1.45]";
+  const steps = element("ol", "list-none m-0 p-0 grid grid-cols-[minmax(0,1fr)] gap-[11px]",
+    element("li", stepItemCls, element("span", stepNumCls, "1"),
+      element("div", "", element("strong", stepTitleCls, "Selecciona o arrastra archivos"),
+        element("p", stepDescCls, "Admite PDF, Office, imágenes y paquetes ZIP directamente desde tu equipo."))),
+    element("li", stepItemCls, element("span", stepNumCls, "2"),
+      element("div", "", element("strong", stepTitleCls, "Ejecuta el análisis local"),
+        element("p", stepDescCls, "Extrae metadatos con ExifTool, calcula SHA-256 y detecta exposiciones sin conexión."))),
+    element("li", stepItemCls, element("span", stepNumCls, "3"),
+      element("div", "", element("strong", stepTitleCls, "Inspecciona, compara o limpia"),
+        element("p", stepDescCls, "Revisa detalles, cronología, compara dos documentos o genera una copia saneada verificada."))));
+  const links = element("div", "flex flex-wrap gap-2 pt-3 border-t border-line",
     link("Investigaciones", "#investigations", "button subtle small-btn"),
     link("Laboratorio de hashes", "#hashes", "button subtle small-btn"),
     link("Manifiestos", "#manifests", "button subtle small-btn"));
@@ -375,7 +465,7 @@ function renderQueue() {
   $("collapse-upload").disabled = state.working;
   $("analyze").disabled = !state.files.length || state.working || !state.engine;
   const rows = state.files.map(({file, id}) => {
-    const name = element("span", "truncate-cell", file.name);
+    const name = element("span", UI.truncate, file.name);
     name.title = file.name;
     const remove = button(icon("x"), () => {
       state.files = state.files.filter((item) => item.id !== id);
@@ -386,9 +476,9 @@ function renderQueue() {
     }, "icon-button");
     remove.disabled = state.working;
     remove.setAttribute("aria-label", "Quitar " + file.name);
-    return element("li", "flex items-center gap-2 justify-between small",
+    return element("li", "py-[7px] flex items-center gap-2 justify-between text-[0.875rem]",
       element("div", "flex items-center gap-2 min-w-0", icon("file"), name),
-      element("div", "flex items-center gap-2", element("span", "muted mono whitespace-nowrap", formatBytes(file.size)), remove));
+      element("div", "flex items-center gap-2", element("span", "text-muted font-mono whitespace-nowrap", formatBytes(file.size)), remove));
   });
   $("queue").replaceChildren(...rows);
   renderIntakeContext();
@@ -501,7 +591,7 @@ function renderResults(session) {
     ["Archivos", summary.count], ["Propiedades", summary.properties], ["Hallazgos", summary.findings],
     ["Errores", summary.statuses.error],
   ];
-  $("stats").replaceChildren(...metrics.map(([label, value]) => element("div", "stat",
+  $("stats").replaceChildren(...metrics.map(([label, value]) => element("div", UI.stat,
     element("strong", "", numbers.format(value)), element("span", "", label))));
   const breakdown = [
     ["Formatos", Object.entries(summary.formats).map(([key, value]) => key + " (" + value + ")")],
@@ -510,8 +600,8 @@ function renderResults(session) {
     ["Estados", Object.entries(summary.statuses).map(([key, value]) => statusNames[key] + " (" + value + ")")],
   ];
   $("breakdown").replaceChildren(...breakdown.map(([label, values]) => element("div", "",
-    element("h3", "", label), values.length ? element("ul", "", ...values.map((value) => element("li", "", value)))
-      : element("p", "small muted", "Sin datos detectados"))));
+    element("h3", UI.h3, label), values.length ? element("ul", "mt-[5px] text-muted text-[0.87rem] break-words", ...values.map((value) => element("li", "", value)))
+      : element("p", UI.smallMuted, "Sin datos detectados"))));
   $("search").value = "";
   setOptions("format-filter", "Todos los formatos", Object.keys(summary.formats).map((item) => [item, item]));
   setOptions("status-filter", "Todos los estados", Object.entries(statusNames));
@@ -520,13 +610,13 @@ function renderResults(session) {
     ? summary.correlations.map((match) => {
         const names = match.files.map((file) => {
           const action = button(file.name, () => enterWorkbench("detail", [session.id, file.id]), "subtle");
-          return element("li", "small", action, " ", element("code", "muted", file.source.join(" / ")));
+          return element("li", "text-[0.875rem] mt-[5px] first:mt-0", action, " ", element("code", UI.code, file.source.join(" / ")));
         });
-        return element("details", "correlation",
-          element("summary", "", fields[match.field] + " · " + display(match.value) + " (" + match.files.length + ")"),
-          element("ul", "", ...names));
+        return element("details", "border-t border-line py-3",
+          element("summary", "break-words text-[0.9rem]", fields[match.field] + " · " + display(match.value) + " (" + match.files.length + ")"),
+          element("ul", "pl-[19px] mt-1.5 list-disc break-words", ...names));
       })
-    : [element("p", "small muted", "No se encontraron campos y valores compartidos.")]));
+    : [element("p", UI.smallMuted, "No se encontraron campos y valores compartidos.")]));
 }
 
 function setOptions(id, label, options) {
@@ -557,11 +647,11 @@ function renderTable() {
   }
   $("match-count").textContent = "(" + rows.length + " de " + session.files.length + ")";
   const output = rows.map((row) => {
-    const status = element("span", "status", statusNames[row.status]);
+    const status = element("span", UI.status, statusNames[row.status]);
     status.dataset.status = row.status;
     const target = "#" + ["detail", session.id, row.id].join("/");
-    const nameText = element("span", "truncate-cell", row.name);
-    const fileLink = link("", target, "file-link");
+    const nameText = element("span", UI.truncate, row.name);
+    const fileLink = link("", target, UI.fileLink);
     fileLink.title = row.name;
     fileLink.append(icon("file"), nameText);
     fileLink.addEventListener("click", (event) => {
@@ -571,21 +661,21 @@ function renderTable() {
     });
     const action = button("Detalles", () => enterWorkbench("detail", [session.id, row.id]), "subtle small-btn");
     action.setAttribute("aria-label", "Detalles de " + row.name);
-    const selection = element("td", "duel-check", comparisonCheckbox(row));
+    const selection = element("td", "px-3 py-2.5 border-t border-line align-middle w-10 text-center [&_input]:align-middle [&_input]:cursor-pointer", comparisonCheckbox(row));
     selection.hidden = session.files.length < 2;
-    return element("tr", "", selection,
-      element("td", "files-name", fileLink),
-      element("td", "table-status", element("span", "status", display(row.format))),
-      element("td", "table-number", formatBytes(row.size)),
-      truncatedCell(row.author, "table-data"),
-      truncatedCell(row.software, "table-data"),
-      truncatedCell(relevantDate(row), "table-date"),
-      element("td", "table-number", numbers.format(row.field_count)),
-      element("td", "table-status", status),
-      element("td", "table-actions", action));
+    return element("tr", UI.tr, selection,
+      element("td", UI.tdName, fileLink),
+      element("td", UI.tdStatus, element("span", UI.status, display(row.format))),
+      element("td", UI.tdNum, formatBytes(row.size)),
+      truncatedCell(row.author, UI.tdData),
+      truncatedCell(row.software, UI.tdData),
+      truncatedCell(relevantDate(row), UI.tdDate),
+      element("td", UI.tdNum, numbers.format(row.field_count)),
+      element("td", UI.tdStatus, status),
+      element("td", UI.tdActions, action));
   });
   if (!output.length) {
-    const empty = element("td", "muted table-empty", "Ningún archivo coincide con los filtros.");
+    const empty = element("td", UI.tableEmpty + " border-t border-line", "Ningún archivo coincide con los filtros.");
     empty.colSpan = session.files.length < 2 ? 9 : 10;
     output.push(element("tr", "", empty));
   }
@@ -595,20 +685,20 @@ function renderTable() {
 
 function infoRows(items) {
   return element("dl", "", ...items.map(([label, value]) =>
-    element("div", "", element("dt", "", label), element("dd", "", value))));
+    element("div", UI.dlRow, element("dt", UI.dt, label), element("dd", UI.dd, value))));
 }
 
 function structured(view) {
   const normalized = view.record.normalized;
-  if (!Object.keys(normalized).length) return element("p", "muted", "Sin campos descriptivos detectados.");
+  if (!Object.keys(normalized).length) return element("p", UI.muted, "Sin campos descriptivos detectados.");
   const indices = new Map(Object.values(normalized).flat().map((item, index) => [item, index]));
   return element("div", "grid gap-2", ...Object.entries(groupNames)
     .filter(([group]) => normalized[group]?.length).map(([group, label]) => {
-      const details = element("details", "", element("summary", "", label + " (" + normalized[group].length + ")"),
+      const details = element("details", UI.details, element("summary", UI.summary, label + " (" + normalized[group].length + ")"),
         infoRows(normalized[group].map((item) => [
           metadataLabel(item),
-          element("div", "metadata-item", metadataValue(item.value, true),
-            element("code", "muted", item.source.join(" / ")), evidenceControl(view, "normalized", indices.get(item))),
+          element("div", UI.metaItem, metadataValue(item.value, true),
+            element("code", UI.code, item.source.join(" / ")), evidenceControl(view, "normalized", indices.get(item))),
         ])));
       details.open = group === "identity";
       return details;
@@ -621,12 +711,12 @@ function technical(view) {
     const pieces = key.split(":");
     const label = pieces.length > 1 ? pieces.slice(0, -1).join(" / ") : "Otros";
     if (!groups.has(label)) groups.set(label, []);
-    groups.get(label).push([pieces.at(-1), element("div", "metadata-item",
+    groups.get(label).push([pieces.at(-1), element("div", UI.metaItem,
       metadataValue(value, true), evidenceControl(view, "raw", key))]);
   }
   return groups.size ? element("div", "grid gap-2", ...Array.from(groups, ([name, values]) =>
-    element("details", "", element("summary", "", name + " (" + values.length + ")"), infoRows(values))))
-    : element("p", "muted", "El motor no devolvió propiedades para este archivo.");
+    element("details", UI.details, element("summary", UI.summary, name + " (" + values.length + ")"), infoRows(values))))
+    : element("p", UI.muted, "El motor no devolvió propiedades para este archivo.");
 }
 
 function downloadJson(record) {
@@ -641,7 +731,7 @@ function downloadJson(record) {
 }
 
 function jsonView(record) {
-  const status = element("p", "small muted");
+  const status = element("p", UI.smallMuted);
   status.setAttribute("role", "status");
   const copy = button("Copiar JSON", async () => {
     try {
@@ -651,68 +741,69 @@ function jsonView(record) {
       status.textContent = "El navegador bloqueó el portapapeles. Puedes seleccionar el texto o descargarlo.";
     }
   });
-  return element("section", "", element("div", "flex gap-2 flex-wrap", copy,
-    button("Descargar JSON", () => downloadJson(record))), status, element("pre", "", JSON.stringify(record, null, 2)));
+  return element("section", "space-y-3", element("div", "flex gap-2 flex-wrap", copy,
+    button("Descargar JSON", () => downloadJson(record))), status, element("pre", UI.pre, JSON.stringify(record, null, 2)));
 }
 
 function findingsView(view) {
   const items = view.record.findings;
-  if (!items.length) return element("p", "muted", "Sin hallazgos potencialmente sensibles.");
-  return element("ul", "", ...items.map((item, index) => element("li", "finding",
+  if (!items.length) return element("p", UI.muted, "Sin hallazgos potencialmente sensibles.");
+  return element("ul", "", ...items.map((item, index) => element("li", UI.finding,
     element("strong", "", metadataLabel(item)),
-    metadataValue(item.value, true), element("p", "muted small", item.description),
-    element("code", "small", item.source.join(" / ")), evidenceControl(view, "finding", index))));
+    metadataValue(item.value, true), element("p", UI.smallMuted, item.description),
+    element("code", UI.code, item.source.join(" / ")), evidenceControl(view, "finding", index))));
 }
 
 function diffTable(rows) {
-  const body = rows.map((row) => element("tr", "", element("td", "",
-    element("code", "", row.source), row.technical ? element("div", "small muted", "Técnico o estructural") : ""),
-  element("td", "before", display(row.before)), element("td", "after", display(row.after))));
-  return element("div", "scroll-table", element("table", "diff-table",
-    element("thead", "", element("tr", "", ...["Campo", "Antes", "Después"].map((name) => {
-      const th = element("th", "", name);
+  const body = rows.map((row) => element("tr", UI.tr, element("td", UI.td + " whitespace-pre-wrap align-top wrap-anywhere",
+    element("code", UI.code, row.source), row.technical ? element("div", UI.smallMuted, "Técnico o estructural") : ""),
+  element("td", UI.td + " whitespace-pre-wrap align-top wrap-anywhere text-error", display(row.before)),
+  element("td", UI.td + " whitespace-pre-wrap align-top wrap-anywhere text-success", display(row.after))));
+  return element("div", UI.scrollTable, element("table", UI.table + " table-fixed min-w-[640px]",
+    element("thead", "", element("tr", "", ...["Campo", "Antes", "Después"].map((name, idx) => {
+      const th = element("th", UI.th + (idx === 0 ? " w-[32%]" : ""), name);
       th.scope = "col";
       return th;
     }))), element("tbody", "", ...body)));
 }
 
 function cleanupView(view) {
-  const box = element("section", "", element("h2", "", "Limpieza de metadatos"));
+  const box = element("section", "space-y-3", element("h2", UI.h2, "Limpieza de metadatos"));
   if (!view.session.temporary || !cleanupKinds.has(view.record.format) || !["ok", "empty"].includes(view.record.status)) {
-    box.append(element("p", "muted", view.session.temporary
+    box.append(element("p", UI.muted, view.session.temporary
       ? "Este archivo está disponible para inspección. Su formato o estado no admite limpieza verificada."
       : "La sesión viene del historial. Vuelve a cargar el archivo para crear una copia."));
     return box;
   }
-  box.append(element("p", "muted", "Crea una copia, verifica su validez y compara los metadatos detectados."));
+  box.append(element("p", UI.muted, "Crea una copia, verifica su validez y compara los metadatos detectados."));
   if (!view.cleaned) {
     const action = button(view.cleaning ? "Verificando copia…" : "Crear copia saneada", () => cleanFile(view), "primary");
     action.disabled = view.cleaning;
     box.append(action);
     if (view.cleaning) {
-      const progress = element("p", "small muted", "Verificando la copia y sus metadatos…");
+      const progress = element("p", UI.smallMuted, "Verificando la copia y sus metadatos…");
       progress.setAttribute("role", "status");
       box.append(progress);
     }
   }
   if (view.error) {
-    const warning = element("p", "notice", view.error);
+    const warning = element("p", UI.notice, view.error);
     warning.dataset.error = "true";
     warning.setAttribute("role", "alert");
     box.append(warning);
   }
   if (view.cleaned) {
     const {after, comparison, policy, limits, exposure_comparison: exposure} = view.cleaned;
-    box.append(element("p", "", policy), element("p", "muted small", limits),
+    box.append(element("p", "", policy), element("p", UI.smallMuted, limits),
       link("Descargar copia saneada", filePath(view.session.id, view.record.id) + "/copy", "button primary"),
-      element("p", "small", "SHA-256 de la copia"),
-      element("code", "", after.sha256));
+      element("p", UI.small, "SHA-256 de la copia"),
+      element("code", UI.code, after.sha256));
     if (exposure) box.append(exposureComparisonView(exposure));
     for (const [key, name] of Object.entries({removed: "Eliminados", changed: "Modificados",
       retained: "Persistentes", added: "Añadidos"})) {
       const rows = comparison[key];
-      const details = element("details", "", element("summary", "", name + " (" + rows.length + ")"),
-        rows.length ? diffTable(rows) : element("p", "muted small", "Sin campos."));
+      const details = element("details", UI.details, element("summary", UI.summary, name + " (" + rows.length + ")"),
+        rows.length ? diffTable(rows) : element("p", UI.smallMuted, "Sin campos."));
       details.open = key === "removed" && Boolean(rows.length);
       box.append(details);
     }
@@ -741,30 +832,34 @@ async function cleanFile(view) {
 }
 
 function hashControl(hash) {
-  if (!hash) return element("span", "muted", "—");
-  const feedback = element("p", "small muted copy-feedback");
+  if (!hash) return element("span", UI.muted, "—");
+  const feedback = element("p", UI.copyFeedback + " basis-full");
   feedback.setAttribute("role", "status");
-  const holder = element("div", "hash-value");
+  const holder = element("div", "flex items-center flex-wrap gap-x-2 gap-y-1.5 min-w-0 max-w-full");
   const copy = button(icon("copy"), () => copyText(hash, holder, feedback, "SHA-256 copiado."), "icon-button");
+  copy.classList.add("min-h-[30px]", "min-w-[30px]", "p-[5px]");
   copy.setAttribute("aria-label", "Copiar SHA-256");
   copy.title = "Copiar SHA-256";
-  holder.append(element("code", "", hash), copy, feedback);
+  holder.append(element("code", "flex-[1_1_14rem] min-w-0 font-mono text-[0.8rem] break-all", hash), copy, feedback);
   return holder;
 }
 
 function renderDetailSummary(view) {
   const record = view.record;
-  const status = element("span", "status", statusNames[record.status]);
+  const status = element("span", UI.status, statusNames[record.status]);
   status.dataset.status = record.status;
   const size = formatBytes(record.size) + (record.size >= 1000 ? " (" + numbers.format(record.size) + " B)" : "");
-  const general = infoRows([
-    ["Formato", display(record.format)], ["Tamaño", size], ["Estado", status],
-    ["SHA-256", hashControl(record.sha256)],
-  ]);
-  general.className = "detail-facts panel";
+  const factItem = (label, value) => element("div", "min-w-0",
+    element("dt", "text-muted text-[0.78rem]", label),
+    element("dd", "mt-[3px] text-[0.88rem] font-medium", value));
+  const general = element("dl", UI.panel + " grid grid-cols-[repeat(3,max-content)_minmax(0,1fr)] max-[1100px]:grid-cols-2 max-[540px]:grid-cols-1 items-start gap-x-6 max-[1100px]:gap-x-[18px] gap-y-2.5 py-3 px-[15px] mb-3.5",
+    factItem("Formato", display(record.format)),
+    factItem("Tamaño", size),
+    factItem("Estado", status),
+    factItem("SHA-256", hashControl(record.sha256)));
   const notices = [...record.errors, ...record.warnings].map((text) => element("li", "", text));
   $("detail-summary").replaceChildren(general,
-    ...(notices.length ? [element("ul", "notice inspection-notices", ...notices)] : []));
+    ...(notices.length ? [element("ul", UI.notice + " mb-3", ...notices)] : []));
 }
 
 function renderDetail(view, tab = "normalized") {
@@ -782,9 +877,9 @@ function renderDetail(view, tab = "normalized") {
   if (!view.navigation) {
     view.navigation = $("file-tools");
     view.navigation.hidden = false;
-    view.outlet = element("div", "inspection-content panel");
+    view.outlet = element("div", "inspection-content " + UI.panel + " min-w-0 py-4 px-[18px] max-[540px]:p-3");
     for (const [key, [text, , glyph]] of Object.entries(choices)) {
-      const item = button(element("span", "sidebar-label", text), () => {
+      const item = button(element("span", UI.sidebarLabel, text), () => {
         renderDetail(view, key);
         if (compactSidebar.matches) setSidebar(false);
       }, "sidebar-tool");
@@ -800,7 +895,7 @@ function renderDetail(view, tab = "normalized") {
     item.setAttribute("aria-pressed", String(item.dataset.view === tab));
   }
   const [, heading, , content] = choices[tab];
-  view.outlet.replaceChildren(...(heading ? [element("h2", "", heading)] : []), content());
+  view.outlet.replaceChildren(...(heading ? [element("h2", UI.h2 + " mb-3", heading)] : []), content());
 }
 
 function confirmDelete(text) {
@@ -840,11 +935,11 @@ async function loadHistory() {
         }
       });
       const remove = button("Eliminar", () => removeSession(entry.id, true));
-      return element("div", "history-row flex items-center justify-between flex-wrap gap-2",
-        element("div", "", element("strong", "", timestamp(entry.created)),
-          element("p", "muted", entry.count + " archivos / " + entry.findings + " hallazgos")),
+      return element("div", "border-t border-line py-3 flex items-center justify-between flex-wrap gap-2",
+        element("div", "", element("strong", "font-semibold", timestamp(entry.created)),
+          element("p", "text-muted text-[0.86rem]", entry.count + " archivos / " + entry.findings + " hallazgos")),
         element("div", "flex gap-2", open, remove));
-    }) : [element("p", "muted", "Todavía no hay sesiones guardadas.")]));
+    }) : [element("p", UI.muted, "Todavía no hay sesiones guardadas.")]));
   } catch (error) {
     if (version === state.historyVersion) message("history-message", error.message, true);
   }

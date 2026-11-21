@@ -69,7 +69,7 @@ function selectHashFile(file) {
   meta.replaceChildren(
     element("div", "flex items-center gap-2 min-w-0", icon("file"),
       element("strong", "min-w-0 break-all", file.name),
-      element("span", "small muted mono whitespace-nowrap", formatBytes(file.size) + " (" + numbers.format(file.size) + " B)")),
+      element("span", "text-[0.875rem] text-muted font-mono whitespace-nowrap", formatBytes(file.size) + " (" + numbers.format(file.size) + " B)")),
     button("Quitar archivo", () => {
       hashLabState.file = null;
       hashLabState.fileKey = "";
@@ -179,10 +179,10 @@ function renderHashCalcResults() {
     return;
   }
   const cards = items.map((item) => {
-    const feedback = element("span", "small muted copy-feedback");
+    const feedback = element("span", UI.copyFeedback);
     feedback.setAttribute("role", "status");
-    const holder = element("div", "hash-result-card");
-    const badge = element("span", "status", item.algorithm);
+    const holder = element("div", UI.cardRow);
+    const badge = element("span", UI.status, item.algorithm);
     if (item.legacy) badge.dataset.status = "unsupported";
     else badge.dataset.status = "ok";
 
@@ -219,13 +219,13 @@ function renderHashCalcResults() {
     }, "subtle");
     if (item.savedId) saveBtn.disabled = true;
 
-    const head = element("div", "hash-result-head",
+    const head = element("div", UI.cardTop,
       element("div", "flex items-center gap-2 flex-wrap", badge,
-        element("span", "small muted", hashLabState.file.name + " · " + formatBytes(hashLabState.file.size))),
+        element("span", UI.smallMuted, hashLabState.file.name + " · " + formatBytes(hashLabState.file.size))),
       element("div", "flex items-center gap-2 flex-wrap", copyBtn, saveBtn, compareBtn));
 
-    holder.append(head, element("code", "hash-digest-code", item.hash));
-    if (item.warning) holder.append(element("p", "small muted", item.warning));
+    holder.append(head, element("code", UI.hashCode, item.hash));
+    if (item.warning) holder.append(element("p", UI.smallMuted, item.warning));
     holder.append(feedback);
     return holder;
   });
@@ -288,8 +288,8 @@ async function runHashComparison() {
     box.dataset.match = res.match ? "yes" : "no";
     box.replaceChildren(
       element("strong", "", res.message),
-      element("p", "small muted", "Algoritmo: " + res.algorithm + " · Longitud verificada: " + res.expected_length + " caracteres hexadecimales."),
-      element("p", "small muted", res.disclaimer),
+      element("p", UI.smallMuted, "Algoritmo: " + res.algorithm + " · Longitud verificada: " + res.expected_length + " caracteres hexadecimales."),
+      element("p", UI.smallMuted, res.disclaimer),
     );
   } catch (error) {
     box.hidden = false;
@@ -339,15 +339,15 @@ async function loadHashHistory() {
     $("hash-history-clear").disabled = records.length === 0 && !q && !algo;
     const list = $("hash-history-list");
     if (!records.length) {
-      list.replaceChildren(element("p", "muted small table-empty",
+      list.replaceChildren(element("p", UI.tableEmpty,
         q || algo ? "Ningún registro coincide con los filtros actuales." : "Todavía no hay registros de hashes guardados."));
       return;
     }
     const rows = records.map((rec) => {
-      const feedback = element("p", "small muted copy-feedback");
+      const feedback = element("p", UI.copyFeedback);
       feedback.setAttribute("role", "status");
-      const card = element("article", "hash-history-row");
-      const badge = element("span", "status", rec.algorithm);
+      const card = element("article", UI.cardRow);
+      const badge = element("span", UI.status, rec.algorithm);
       if (hashAlgoMeta[rec.algorithm]?.legacy) badge.dataset.status = "unsupported";
 
       const copyBtn = button("Copiar", () => copyText(rec.hash, card, feedback, "Hash copiado."), "subtle");
@@ -368,14 +368,14 @@ async function loadHashHistory() {
       }, "quiet");
 
       card.append(
-        element("div", "hash-history-top",
+        element("div", UI.cardTop,
           element("div", "min-w-0",
             element("div", "flex items-center gap-2 flex-wrap",
               element("strong", "break-all", rec.name), badge),
-            element("p", "small muted",
+            element("p", UI.smallMuted,
               formatBytes(rec.size) + " (" + numbers.format(rec.size) + " B) · " + timestamp(rec.created) + " · ID " + rec.id.slice(0, 8))),
           element("div", "flex flex-wrap gap-2", verifyBtn, copyBtn, compareBtn, delBtn)),
-        element("code", "hash-digest-code", rec.hash),
+        element("code", UI.hashCode, rec.hash),
         feedback,
       );
       return card;
@@ -392,7 +392,7 @@ async function handleVerifyAgainstHistory(file) {
   const banner = $("hash-verify-banner");
   banner.hidden = false;
   banner.dataset.state = "loading";
-  banner.replaceChildren(element("p", "small", "Verificando «" + file.name + "» contra el registro " + rec.id.slice(0, 8) + " (" + rec.algorithm + ")…"));
+  banner.replaceChildren(element("p", UI.small, "Verificando «" + file.name + "» contra el registro " + rec.id.slice(0, 8) + " (" + rec.algorithm + ")…"));
   try {
     const response = await fetch("/api/hashes/history/" + encodeURIComponent(rec.id) + "/verify", {
       method: "POST",
@@ -413,17 +413,17 @@ async function handleVerifyAgainstHistory(file) {
     banner.replaceChildren(
       element("div", "flex items-center justify-between gap-2 flex-wrap",
         element("strong", "", res.message), closeBtn),
-      element("p", "small muted",
+      element("p", UI.smallMuted,
         "Referencia: " + res.record.name + " (" + formatBytes(res.record.size) + ") · Seleccionado: " + res.actual.name + " (" + formatBytes(res.actual.size) + ")"),
-      element("p", "small muted mono", "Esperado (" + res.record.algorithm + "): " + res.record.hash),
-      element("p", "small muted mono", "Calculado (" + res.actual.algorithm + "): " + res.actual.hash),
-      element("p", "small muted", res.disclaimer),
+      element("p", "text-[0.875rem] text-muted font-mono break-all", "Esperado (" + res.record.algorithm + "): " + res.record.hash),
+      element("p", "text-[0.875rem] text-muted font-mono break-all", "Calculado (" + res.actual.algorithm + "): " + res.actual.hash),
+      element("p", UI.smallMuted, res.disclaimer),
     );
   } catch (error) {
     banner.dataset.state = "error";
     banner.replaceChildren(
       element("strong", "", "No fue posible realizar la verificación."),
-      element("p", "small", error.message),
+      element("p", UI.small, error.message),
     );
   } finally {
     hashLabState.verifyingRecord = null;

@@ -157,7 +157,7 @@ function renderGeneratedManifest(manifest, errors) {
   const out = $("manifest-gen-output");
   out.hidden = false;
   const jsonText = JSON.stringify(manifest, null, 2);
-  const feedback = element("span", "small muted copy-feedback");
+  const feedback = element("span", UI.copyFeedback);
   feedback.setAttribute("role", "status");
 
   const actions = element("div", "flex flex-wrap items-center gap-2",
@@ -174,33 +174,33 @@ function renderGeneratedManifest(manifest, errors) {
     feedback);
 
   const previewRows = manifest.files.slice(0, 50).map((f) => {
-    const pathCode = element("code", "truncate-cell", f.path);
+    const pathCode = element("code", UI.truncate + " font-mono text-[0.82rem]", f.path);
     pathCode.title = f.path;
-    const hashCode = element("code", "hash-inline", f.hash);
+    const hashCode = element("code", UI.hashInline, f.hash);
     hashCode.title = f.hash;
-    return element("tr", "",
-      element("td", "files-name", pathCode),
-      element("td", "table-number", formatBytes(f.size)),
-      element("td", "", hashCode));
+    return element("tr", UI.tr,
+      element("td", UI.tdName, pathCode),
+      element("td", UI.tdNum, formatBytes(f.size)),
+      element("td", UI.td, hashCode));
   });
 
-  const table = element("div", "scroll-table",
-    element("table", "manifest-table",
+  const table = element("div", UI.scrollTable,
+    element("table", UI.table + " min-w-[760px]",
       element("thead", "", element("tr", "",
-        element("th", "", "Ruta relativa"), element("th", "", "Tamaño"), element("th", "", "Hash (" + manifest.algorithm + ")"))),
+        element("th", UI.th, "Ruta relativa"), element("th", UI.th, "Tamaño"), element("th", UI.th, "Hash (" + manifest.algorithm + ")"))),
       element("tbody", "", ...previewRows)));
 
   const nodes = [actions];
   if (errors.length) {
-    nodes.push(element("div", "notice",
+    nodes.push(element("div", UI.notice,
       element("strong", "", "Archivos omitidos por error (" + errors.length + "):"),
-      element("ul", "duel-notes small", ...errors.map((e) => element("li", "", e)))));
+      element("ul", UI.duelNotes + " text-[0.875rem]", ...errors.map((e) => element("li", "", e)))));
   }
   nodes.push(table);
   if (manifest.files.length > 50) {
-    nodes.push(element("p", "small muted", "Mostrando los primeros 50 de " + numbers.format(manifest.files.length) + " archivos. Descarga el JSON para ver el manifiesto completo."));
+    nodes.push(element("p", UI.smallMuted, "Mostrando los primeros 50 de " + numbers.format(manifest.files.length) + " archivos. Descarga el JSON para ver el manifiesto completo."));
   }
-  nodes.push(element("details", "", element("summary", "small", "Vista JSON completa"), element("pre", "", jsonText)));
+  nodes.push(element("details", UI.details, element("summary", UI.summary + " text-[0.875rem]", "Vista JSON completa"), element("pre", UI.pre, jsonText)));
   out.replaceChildren(...nodes);
 }
 
@@ -303,21 +303,21 @@ function renderManifestVerification(report) {
     verified_with_extra: "Archivos del manifiesto íntegros (hay archivos adicionales)",
     mismatch: "Se detectaron diferencias de integridad",
   };
-  const banner = element("div", "verify-banner",
+  const banner = element("div", UI.banner,
     element("strong", "", verdictTitles[report.status] || "Resultado de verificación"),
-    element("p", "small muted",
+    element("p", UI.smallMuted,
       "Algoritmo: " + report.manifest.algorithm + " · Manifiesto del " + timestamp(report.manifest.createdAt)
       + " · Esperados: " + numbers.format(report.summary.expected_total) + " · Observados: " + numbers.format(report.summary.observed_total)));
   banner.dataset.state = report.status === "verified" ? "verified" : report.status === "verified_with_extra" ? "warning" : "changed";
 
-  const stats = element("div", "stats manifest-stats",
+  const stats = element("div", UI.stats + " border-y border-line py-2.5",
     ...[
       ["Sin cambios", report.summary.unchanged],
       ["Modificados", report.summary.modified],
       ["Faltantes", report.summary.missing],
       ["Adicionales", report.summary.extra],
       ["No analizables", report.summary.unreadable],
-    ].map(([label, val]) => element("div", "stat", element("strong", "", numbers.format(val)), element("span", "", label))));
+    ].map(([label, val]) => element("div", UI.stat, element("strong", "", numbers.format(val)), element("span", "", label))));
 
   const exportBar = element("div", "flex flex-wrap gap-2",
     button("Exportar resultado JSON", () => downloadBlobFile(
@@ -330,47 +330,47 @@ function renderManifestVerification(report) {
       }
     }, "subtle"));
 
-  const filter = element("select", "");
+  const filter = element("select", UI.select);
   filter.setAttribute("aria-label", "Filtrar estado de archivos");
   filter.append(new Option("Todos los estados (" + report.rows.length + ")", ""),
     ...Object.entries(manifestStatusMeta).map(([k, v]) => new Option(v.label + " (" + report.summary[k] + ")", k)));
 
-  const tableHost = element("div", "scroll-table");
+  const tableHost = element("div", UI.scrollTable);
   const renderRows = () => {
     const filtered = report.rows.filter((r) => !filter.value || r.status === filter.value);
     if (!filtered.length) {
-      tableHost.replaceChildren(element("p", "small muted table-empty", "Ningún archivo coincide con el filtro."));
+      tableHost.replaceChildren(element("p", UI.tableEmpty, "Ningún archivo coincide con el filtro."));
       return;
     }
     const body = filtered.map((row) => {
       const meta = manifestStatusMeta[row.status] || {label: row.status, badge: ""};
-      const badge = element("span", "status", meta.label);
+      const badge = element("span", UI.status, meta.label);
       if (meta.badge) badge.dataset.status = meta.badge;
-      const pathCode = element("code", "truncate-cell", row.path);
+      const pathCode = element("code", UI.truncate + " font-mono text-[0.82rem]", row.path);
       pathCode.title = row.path;
-      const expCode = row.expected_hash ? element("code", "hash-inline", row.expected_hash) : element("span", "muted", "—");
+      const expCode = row.expected_hash ? element("code", UI.hashInline, row.expected_hash) : element("span", UI.muted, "—");
       if (row.expected_hash) expCode.title = row.expected_hash;
-      const actCode = row.actual_hash ? element("code", "hash-inline", row.actual_hash) : element("span", "muted", "—");
+      const actCode = row.actual_hash ? element("code", UI.hashInline, row.actual_hash) : element("span", UI.muted, "—");
       if (row.actual_hash) actCode.title = row.actual_hash;
-      return element("tr", "",
-        element("td", "files-name", pathCode),
-        element("td", "table-status", badge),
-        element("td", "", expCode),
-        element("td", "", actCode),
-        element("td", "small muted", row.detail));
+      return element("tr", UI.tr,
+        element("td", UI.tdName, pathCode),
+        element("td", UI.tdStatus, badge),
+        element("td", UI.td, expCode),
+        element("td", UI.td, actCode),
+        element("td", UI.td + " text-[0.875rem] text-muted", row.detail));
     });
-    tableHost.replaceChildren(element("table", "manifest-table",
+    tableHost.replaceChildren(element("table", UI.table + " min-w-[760px]",
       element("thead", "", element("tr", "",
-        element("th", "", "Ruta"), element("th", "", "Estado"),
-        element("th", "", "Hash esperado"), element("th", "", "Hash actual"), element("th", "", "Detalle"))),
+        element("th", UI.th, "Ruta"), element("th", UI.th, "Estado"),
+        element("th", UI.th, "Hash esperado"), element("th", UI.th, "Hash actual"), element("th", UI.th, "Detalle"))),
       element("tbody", "", ...body)));
   };
   filter.addEventListener("change", renderRows);
   renderRows();
 
-  const warnings = (report.warnings || []).map((w) => element("p", "notice small", w));
+  const warnings = (report.warnings || []).map((w) => element("p", UI.notice, w));
   container.replaceChildren(banner, stats, exportBar, ...warnings,
-    element("div", "duel-filters", filter), tableHost);
+    element("div", UI.duelFilters, filter), tableHost);
 }
 
 function initManifests() {

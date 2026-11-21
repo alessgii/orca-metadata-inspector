@@ -2,8 +2,9 @@
 
 const $ = (id) => document.getElementById(id);
 const statusNames = {ok: "Analizado", empty: "Sin descriptivos", unsupported: "No compatible", error: "Error"};
-const pages = ["workspace", "history", "guide", "detail", "duel", "hashes", "manifests"];
+const pages = ["workspace", "history", "guide", "detail", "duel", "hashes", "manifests", "investigations", "investigation"];
 const storedId = /^[a-f0-9]{32}$/;
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const fields = {
   author: "Autor declarado", organization: "Organización", username: "Usuario", created: "Creación",
   modified: "Modificación", software: "Software", version: "Versión", operating_system: "Sistema operativo",
@@ -106,15 +107,44 @@ async function checkEngine() {
   renderQueue();
 }
 
-const compactSidebar = window.matchMedia("(max-width: 700px)");
+const compactSidebar = window.matchMedia("(max-width: 768px)");
 
-function setSidebar(expanded) {
-  $("sidebar").dataset.collapsed = String(!expanded);
+const pageTitles = {
+  workspace: "Analizador de archivos",
+  investigations: "Investigaciones",
+  investigation: "Investigación",
+  duel: "Duelo de documentos",
+  hashes: "Laboratorio de hashes",
+  history: "Historial local",
+  manifests: "Manifiestos de integridad",
+  guide: "Guía de uso",
+  detail: "Inspector de archivo",
+};
+
+function setTopbarContext(text) {
+  const node = $("topbar-context");
+  if (!node) return;
+  node.textContent = text;
+  node.title = text;
+}
+
+function truncatedCell(value, className = "table-data") {
+  const text = display(value);
+  const span = element("span", "truncate-cell", text);
+  if (text !== "—") span.title = text;
+  return element("td", className, span);
+}
+
+function setSidebar(pinned) {
+  const sidebar = $("sidebar");
+  sidebar.dataset.pinned = String(Boolean(pinned));
   const toggle = $("sidebar-toggle");
-  const label = expanded ? "Plegar barra lateral" : "Expandir barra lateral";
-  toggle.setAttribute("aria-expanded", String(expanded));
+  const label = pinned ? "Contraer barra lateral" : "Fijar barra lateral";
+  toggle.setAttribute("aria-pressed", String(Boolean(pinned)));
   toggle.setAttribute("aria-label", label);
   toggle.title = label;
+  const text = $("sidebar-pin-label");
+  if (text) text.textContent = pinned ? "Modo compacto" : "Fijar barra";
 }
 
 function focusHeading(page) {
@@ -139,25 +169,29 @@ async function updatePage(presentation = {}) {
   const [name, ...ids] = location.hash.slice(1).split("/");
   const workbench = (name === "detail" && ids.length === 2 || name === "duel" && ids.length === 3)
     && ids.every((id) => storedId.test(id));
-  const current = workbench || ["history", "guide", "hashes", "manifests", "duel"].includes(name) ? name : "workspace";
+  const invView = name === "investigation" && ids.length >= 1 && uuidPattern.test(ids[0]);
+  const current = workbench || invView || ["history", "guide", "hashes", "manifests", "duel", "investigations"].includes(name) ? name : "workspace";
   const previous = state.page;
   state.page = current;
   state.inspection = null;
   $("file-tools").hidden = true;
   $("file-tools").replaceChildren();
   for (const page of pages) $("page-" + page).hidden = page !== current;
-  const navTarget = current === "detail" ? "workspace" : current;
+  const navTarget = current === "detail" ? "workspace" : (current === "investigation" ? "investigations" : current);
   for (const item of document.querySelectorAll("[data-page]")) {
     if (item.dataset.page === navTarget) item.setAttribute("aria-current", "page");
     else item.removeAttribute("aria-current");
   }
+  setTopbarContext(pageTitles[current] || "Analizador");
   if (!workbench) {
     const trigger = state.returnFocus;
     state.returnFocus = null;
     if (current === "workspace" && trigger?.isConnected && !trigger.closest("[hidden]")) trigger.focus();
-    else if (previous && previous !== current) focusHeading(current);
+    else if (previous && previous !== current && !invView) focusHeading(current);
     if (current === "history") loadHistory();
     if (current === "duel") renderDuelHub();
+    if (current === "investigations") loadInvestigationsList();
+    if (current === "investigation" && invView) openInvestigation(ids[0], ids[1] || null);
     if (current === "hashes") {
       if (ids[0] && ["calc", "compare", "history"].includes(ids[0])) setHashTab(ids[0]);
       else if (hashLabState.tab === "history") loadHashHistory();
@@ -185,6 +219,7 @@ async function updatePage(presentation = {}) {
       const view = {session, record, cleaned: null, cleaning: false, error: ""};
       state.inspection = view;
       $("detail-title").textContent = record.name;
+      setTopbarContext("Analizador · " + record.name);
       renderDetailSummary(view);
       renderDetail(view);
     } else {
@@ -219,6 +254,118 @@ function addFiles(files) {
   renderQueue();
 }
 
+const extFormatMap = {
+  pdf: "PDF", docx: "DOCX", xlsx: "XLSX", pptx: "PPTX",
+  jpg: "JPEG", jpeg: "JPEG", png: "PNG", webp: "WebP", zip: "ZIP",
+};
+
+function renderIntakeContext(progressInfo = null) {
+  const titleNode = $("context-title");
+  const body = $("intake-context-body");
+  if (!titleNode || !body) return;
+
+  // 1. Real analysis in progress (no fake percentages)
+  if (state.working) {
+    titleNode.textContent = "Análisis en curso";
+    const info = progressInfo || {title: "Cargando y validando archivos", processed: null, total: null, current: ""};
+    const bar = element("progress", "");
+    bar.setAttribute("aria-label", "Progreso real del análisis");
+    if (typeof info.processed === "number" && typeof info.total === "number" && info.total > 0) {
+      bar.max = info.total;
+      bar.value = info.processed;
+    }
+    const countText = (typeof info.processed === "number" && typeof info.total === "number")
+      ? numbers.format(info.processed) + " / " + numbers.format(info.total) + " archivo(s)"
+      : "Preparando lote…";
+    const card = element("div", "context-progress",
+      element("div", "flex items-center justify-between gap-2 flex-wrap",
+        element("strong", "small", info.title),
+        element("span", "mono small muted", countText)),
+      bar,
+      element("p", "small muted truncate-cell", info.current || "Esperando respuesta del motor local…"));
+    body.replaceChildren(
+      card,
+      element("p", "small muted", "El procesamiento ocurre de forma local con ExifTool. Los archivos originales permanecen en tu equipo."));
+    return;
+  }
+
+  // 2. Files queued for analysis
+  if (state.files.length > 0) {
+    titleNode.textContent = "Resumen de selección";
+    const totalBytes = state.files.reduce((sum, item) => sum + item.file.size, 0);
+    const counts = new Map();
+    for (const {file} of state.files) {
+      const ext = file.name.includes(".") ? file.name.split(".").pop().toLowerCase() : "";
+      const fmt = extFormatMap[ext] || "Otro";
+      counts.set(fmt, (counts.get(fmt) || 0) + 1);
+    }
+    const stats = element("div", "stats",
+      element("div", "stat", element("strong", "", numbers.format(state.files.length)), element("span", "", state.files.length === 1 ? "Archivo" : "Archivos")),
+      element("div", "stat", element("strong", "", formatBytes(totalBytes)), element("span", "", "Tamaño total")));
+
+    const formatChips = element("div", "context-formats",
+      ...Array.from(counts.entries()).map(([fmt, count]) =>
+        element("span", "status", fmt + " (" + numbers.format(count) + ")")));
+
+    const saveHint = $("keep").checked
+      ? "Los resultados se guardarán en el historial SQLite local (sin copias permanentes de los originales)."
+      : "Sesión temporal: los archivos y copias caducan automáticamente al cerrar o vencer la retención.";
+
+    body.replaceChildren(
+      element("div", "slide-diff-body",
+        stats,
+        element("div", "field-group",
+          element("span", "small muted", "Formatos por extensión (se confirmarán por firma binaria):"),
+          formatChips)),
+      element("p", "small muted", saveHint));
+    return;
+  }
+
+  // 3. Completed session summary + contextual shortcuts
+  if (state.session) {
+    titleNode.textContent = "Última sesión analizada";
+    const s = state.session.summary;
+    const stats = element("div", "stats",
+      element("div", "stat", element("strong", "", numbers.format(s.count)), element("span", "", "Archivos")),
+      element("div", "stat", element("strong", "", numbers.format(s.properties)), element("span", "", "Propiedades")),
+      element("div", "stat", element("strong", "", numbers.format(s.findings)), element("span", "", "Hallazgos")),
+      element("div", "stat", element("strong", "", numbers.format(s.statuses.error)), element("span", "", "Errores")));
+    const actions = element("div", "context-links");
+    if (state.session.files.length >= 2) {
+      actions.append(link("Abrir Duelo", "#duel", "button accent-button small-btn"));
+    }
+    actions.append(
+      link("Investigaciones", "#investigations", "button subtle small-btn"),
+      link("Laboratorio de hashes", "#hashes", "button subtle small-btn"),
+      link("Manifiestos", "#manifests", "button subtle small-btn"));
+    body.replaceChildren(
+      element("div", "slide-diff-body",
+        stats,
+        element("p", "small muted",
+          "Consulta los resultados en la tabla inferior o selecciona nuevos archivos a la izquierda para iniciar otro análisis.")),
+      actions);
+    return;
+  }
+
+  // 4. Initial empty state: concise 3-step quick guide
+  titleNode.textContent = "Cómo empezar";
+  const steps = element("ol", "context-steps",
+    element("li", "", element("span", "step-num", "1"),
+      element("div", "", element("strong", "", "Selecciona o arrastra archivos"),
+        element("p", "", "Admite PDF, Office, imágenes y paquetes ZIP directamente desde tu equipo."))),
+    element("li", "", element("span", "step-num", "2"),
+      element("div", "", element("strong", "", "Ejecuta el análisis local"),
+        element("p", "", "Extrae metadatos con ExifTool, calcula SHA-256 y detecta exposiciones sin conexión."))),
+    element("li", "", element("span", "step-num", "3"),
+      element("div", "", element("strong", "", "Inspecciona, compara o limpia"),
+        element("p", "", "Revisa detalles, cronología, compara dos documentos o genera una copia saneada verificada."))));
+  const links = element("div", "context-links",
+    link("Investigaciones", "#investigations", "button subtle small-btn"),
+    link("Laboratorio de hashes", "#hashes", "button subtle small-btn"),
+    link("Manifiestos", "#manifests", "button subtle small-btn"));
+  body.replaceChildren(steps, links);
+}
+
 function renderQueue() {
   $("queue").hidden = !state.files.length;
   $("reset").hidden = !state.files.length;
@@ -228,7 +375,8 @@ function renderQueue() {
   $("collapse-upload").disabled = state.working;
   $("analyze").disabled = !state.files.length || state.working || !state.engine;
   const rows = state.files.map(({file, id}) => {
-    const name = element("span", "min-w-0 break-all", file.name);
+    const name = element("span", "truncate-cell", file.name);
+    name.title = file.name;
     const remove = button(icon("x"), () => {
       state.files = state.files.filter((item) => item.id !== id);
       message("upload-message");
@@ -243,6 +391,7 @@ function renderQueue() {
       element("div", "flex items-center gap-2", element("span", "muted mono whitespace-nowrap", formatBytes(file.size)), remove));
   });
   $("queue").replaceChildren(...rows);
+  renderIntakeContext();
 }
 
 function validateSelection() {
@@ -295,6 +444,12 @@ async function analyze() {
       $("progress").max = next.total;
       $("progress").value = next.processed;
       $("progress-current").textContent = next.current ?? "Sesión en espera";
+      renderIntakeContext({
+        title: "Extrayendo metadatos",
+        processed: next.processed,
+        total: next.total,
+        current: next.current ?? "Sesión en espera",
+      });
       await new Promise((resolve) => setTimeout(resolve, 400));
     }
     state.files = [];
@@ -330,7 +485,11 @@ function renderResults(session) {
     sort.disabled = !loaded;
     if (!loaded) sort.parentElement.removeAttribute("aria-sort");
   }
-  if (!session) return;
+  if (!session) {
+    renderIntakeContext();
+    return;
+  }
+  renderIntakeContext();
   const summary = session.summary;
   $("result-meta").textContent = [
     timestamp(session.created), (session.duration_ms / 1000).toLocaleString("es") + " s",
@@ -401,26 +560,29 @@ function renderTable() {
     const status = element("span", "status", statusNames[row.status]);
     status.dataset.status = row.status;
     const target = "#" + ["detail", session.id, row.id].join("/");
-    const fileLink = link(row.name, target, "file-link");
-    fileLink.prepend(icon("file"));
+    const nameText = element("span", "truncate-cell", row.name);
+    const fileLink = link("", target, "file-link");
+    fileLink.title = row.name;
+    fileLink.append(icon("file"), nameText);
     fileLink.addEventListener("click", (event) => {
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       event.preventDefault();
       enterWorkbench("detail", [session.id, row.id]);
     });
-    const action = button("Detalles", () => enterWorkbench("detail", [session.id, row.id]), "quiet");
+    const action = button("Detalles", () => enterWorkbench("detail", [session.id, row.id]), "subtle small-btn");
     action.setAttribute("aria-label", "Detalles de " + row.name);
     const selection = element("td", "duel-check", comparisonCheckbox(row));
     selection.hidden = session.files.length < 2;
     return element("tr", "", selection,
       element("td", "files-name", fileLink),
-      element("td", "", element("span", "status", display(row.format))),
-      element("td", "whitespace-nowrap table-number", formatBytes(row.size)),
-      element("td", "table-data", display(row.author)),
-      element("td", "table-data", display(row.software)),
-      element("td", "table-data", display(relevantDate(row))),
+      element("td", "table-status", element("span", "status", display(row.format))),
+      element("td", "table-number", formatBytes(row.size)),
+      truncatedCell(row.author, "table-data"),
+      truncatedCell(row.software, "table-data"),
+      truncatedCell(relevantDate(row), "table-date"),
       element("td", "table-number", numbers.format(row.field_count)),
-      element("td", "", status), element("td", "", action));
+      element("td", "table-status", status),
+      element("td", "table-actions", action));
   });
   if (!output.length) {
     const empty = element("td", "muted table-empty", "Ningún archivo coincide con los filtros.");
@@ -714,6 +876,7 @@ $("reset").addEventListener("click", () => {
   $("pick").focus();
 });
 $("analyze").addEventListener("click", analyze);
+$("keep").addEventListener("change", () => renderIntakeContext());
 $("close-session").addEventListener("click", () => removeSession(state.session.id));
 $("reopen-upload").addEventListener("click", () => {
   setUploadOpen(true);
@@ -760,18 +923,18 @@ for (const eventName of ["dragover", "drop"]) window.addEventListener(eventName,
   if (event.dataTransfer.types.includes("Files")) event.preventDefault();
 });
 $("sidebar-toggle").addEventListener("click", () => {
-  setSidebar($("sidebar").dataset.collapsed === "true");
+  setSidebar($("sidebar").dataset.pinned !== "true");
 });
-compactSidebar.addEventListener("change", (event) => setSidebar(!event.matches));
 $("sidebar").addEventListener("click", (event) => {
   if (compactSidebar.matches && event.target.closest("a")) setSidebar(false);
 });
 $("sidebar").addEventListener("keydown", (event) => {
-  if (event.key !== "Escape" || $("sidebar").dataset.collapsed === "true") return;
-  setSidebar(false);
-  $("sidebar-toggle").focus();
+  if (event.key === "Escape" && $("sidebar").dataset.pinned === "true") {
+    setSidebar(false);
+    $("sidebar-toggle").focus();
+  }
 });
-setSidebar(!compactSidebar.matches);
+setSidebar(false);
 document.querySelector(".skip").addEventListener("click", (event) => {
   event.preventDefault();
   $("main").focus();
@@ -779,6 +942,7 @@ document.querySelector(".skip").addEventListener("click", (event) => {
 window.addEventListener("hashchange", () => updatePage());
 initHashLab();
 initManifests();
+initInvestigations();
 renderResults(null);
 updatePage();
 checkEngine();

@@ -173,13 +173,19 @@ function renderGeneratedManifest(manifest, errors) {
     }, "accent-button"),
     feedback);
 
-  const previewRows = manifest.files.slice(0, 50).map((f) => element("tr", "",
-    element("td", "", element("code", "", f.path)),
-    element("td", "table-number whitespace-nowrap", formatBytes(f.size)),
-    element("td", "", element("code", "hash-inline", f.hash))));
+  const previewRows = manifest.files.slice(0, 50).map((f) => {
+    const pathCode = element("code", "truncate-cell", f.path);
+    pathCode.title = f.path;
+    const hashCode = element("code", "hash-inline", f.hash);
+    hashCode.title = f.hash;
+    return element("tr", "",
+      element("td", "files-name", pathCode),
+      element("td", "table-number", formatBytes(f.size)),
+      element("td", "", hashCode));
+  });
 
   const table = element("div", "scroll-table",
-    element("table", "",
+    element("table", "manifest-table",
       element("thead", "", element("tr", "",
         element("th", "", "Ruta relativa"), element("th", "", "Tamaño"), element("th", "", "Hash (" + manifest.algorithm + ")"))),
       element("tbody", "", ...previewRows)));
@@ -340,14 +346,20 @@ function renderManifestVerification(report) {
       const meta = manifestStatusMeta[row.status] || {label: row.status, badge: ""};
       const badge = element("span", "status", meta.label);
       if (meta.badge) badge.dataset.status = meta.badge;
+      const pathCode = element("code", "truncate-cell", row.path);
+      pathCode.title = row.path;
+      const expCode = row.expected_hash ? element("code", "hash-inline", row.expected_hash) : element("span", "muted", "—");
+      if (row.expected_hash) expCode.title = row.expected_hash;
+      const actCode = row.actual_hash ? element("code", "hash-inline", row.actual_hash) : element("span", "muted", "—");
+      if (row.actual_hash) actCode.title = row.actual_hash;
       return element("tr", "",
-        element("td", "", element("code", "", row.path)),
-        element("td", "", badge),
-        element("td", "", row.expected_hash ? element("code", "hash-inline", row.expected_hash) : element("span", "muted", "—")),
-        element("td", "", row.actual_hash ? element("code", "hash-inline", row.actual_hash) : element("span", "muted", "—")),
+        element("td", "files-name", pathCode),
+        element("td", "table-status", badge),
+        element("td", "", expCode),
+        element("td", "", actCode),
         element("td", "small muted", row.detail));
     });
-    tableHost.replaceChildren(element("table", "",
+    tableHost.replaceChildren(element("table", "manifest-table",
       element("thead", "", element("tr", "",
         element("th", "", "Ruta"), element("th", "", "Estado"),
         element("th", "", "Hash esperado"), element("th", "", "Hash actual"), element("th", "", "Detalle"))),

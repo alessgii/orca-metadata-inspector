@@ -15,47 +15,60 @@
   <script defer src="/static/inspection.js"></script>
   <script defer src="/static/hash-lab.js"></script>
   <script defer src="/static/manifests.js"></script>
+  <script defer src="/static/investigations.js"></script>
   <script defer src="/static/app.js"></script>
 </head>
 <body>
 <a href="#main" class="sr-only focus:not-sr-only skip">Saltar al contenido</a>
-<div class="app-shell">
-  <aside id="sidebar" class="sidebar" aria-label="Barra de herramientas">
-    <div class="sidebar-header">
-      <a href="#workspace" class="brand" aria-label="La Orca, Inspector" title="La Orca">
-        <img src="/static/mark.svg" width="33" height="33" alt="">
-        <span class="sidebar-label"><strong>La Orca</strong><small>Inspector de metadatos</small></span>
+<header class="app-header">
+  <div class="app-bar">
+    <div class="app-bar-context">
+      <a href="#workspace" class="brand" aria-label="La Orca, Inspector de metadatos" title="La Orca · Inspector de metadatos">
+        <img src="/static/mark.svg" width="30" height="30" alt="">
+        <span class="brand-text"><strong>La Orca</strong><small>Inspector de metadatos</small></span>
       </a>
-      <button id="sidebar-toggle" class="button icon-button" type="button" aria-expanded="true"
-        aria-controls="sidebar-tools" aria-label="Plegar barra lateral" title="Plegar barra lateral">{{icon('sidebar')}}</button>
+      <span class="app-bar-sep" aria-hidden="true">/</span>
+      <span id="topbar-context" class="topbar-context">Analizador de archivos</span>
     </div>
-    <div id="sidebar-tools" class="sidebar-tools">
-      <nav class="app-nav sidebar-nav" aria-label="Principal">
-        <a class="sidebar-tool" href="#workspace" data-page="workspace" aria-current="page"
-          aria-label="Analizador de archivos" title="Analizador de archivos">{{icon('scan')}}<span class="sidebar-label">Analizador</span></a>
-        <a class="sidebar-tool" href="#duel" data-page="duel"
-          aria-label="Duelo de documentos" title="Duelo de documentos">{{icon('compare')}}<span class="sidebar-label">Duelo</span></a>
-        <a class="sidebar-tool" href="#hashes" data-page="hashes"
-          aria-label="Laboratorio de hashes" title="Laboratorio de hashes">{{icon('hash')}}<span class="sidebar-label">Laboratorio de hashes</span></a>
-        <a class="sidebar-tool" href="#history" data-page="history" aria-label="Historial" title="Historial">
-          {{icon('history')}}<span class="sidebar-label">Historial</span></a>
-        <a class="sidebar-tool" href="#manifests" data-page="manifests"
-          aria-label="Manifiestos de integridad" title="Manifiestos de integridad">{{icon('manifest')}}<span class="sidebar-label">Manifiestos</span></a>
-        <a class="sidebar-tool" href="#guide" data-page="guide" aria-label="Guía de uso" title="Guía de uso">
-          {{icon('help')}}<span class="sidebar-label">Guía de uso</span></a>
-      </nav>
-      <nav id="file-tools" class="sidebar-nav file-tools" aria-label="Vistas del archivo" hidden></nav>
+    <div class="app-bar-controls">
+      <span class="health" role="status"><span id="engine-dot"></span><span id="engine">Comprobando ExifTool</span></span>
+      <button id="theme-toggle" class="button icon-button theme-toggle" type="button" aria-label="Cambiar tema" aria-pressed="false" title="Cambiar entre tema claro y oscuro">
+        {{icon('moon', 'icon theme-moon')}}{{icon('sun', 'icon theme-sun')}}
+      </button>
     </div>
-  </aside>
-  <div class="app-content">
-    <header class="app-header">
-      <div class="app-bar">
-        <span class="health" role="status"><span id="engine-dot"></span><span id="engine">Comprobando ExifTool</span></span>
-        <button id="theme-toggle" class="button icon-button theme-toggle" type="button" aria-label="Tema oscuro" aria-pressed="false" title="Cambiar tema">
-          {{icon('moon', 'icon theme-moon')}}{{icon('sun', 'icon theme-sun')}}
+  </div>
+</header>
+<div class="app-shell" id="app-shell">
+  <div class="sidebar-shell" id="sidebar-shell">
+    <aside id="sidebar" class="sidebar" aria-label="Navegación principal" data-pinned="false">
+      <div id="sidebar-tools" class="sidebar-tools">
+        <nav class="app-nav sidebar-nav" aria-label="Principal">
+          <a class="sidebar-tool" href="#workspace" data-page="workspace" aria-current="page"
+            aria-label="Analizador" title="Analizador">{{icon('scan')}}<span class="sidebar-label">Analizador</span></a>
+          <a class="sidebar-tool" href="#investigations" data-page="investigations"
+            aria-label="Investigaciones" title="Investigaciones">{{icon('case')}}<span class="sidebar-label">Investigaciones</span></a>
+          <a class="sidebar-tool" href="#duel" data-page="duel"
+            aria-label="Duelo" title="Duelo">{{icon('compare')}}<span class="sidebar-label">Duelo</span></a>
+          <a class="sidebar-tool" href="#hashes" data-page="hashes"
+            aria-label="Laboratorio de hashes" title="Laboratorio de hashes">{{icon('hash')}}<span class="sidebar-label">Laboratorio de hashes</span></a>
+          <a class="sidebar-tool" href="#history" data-page="history" aria-label="Historial" title="Historial">
+            {{icon('history')}}<span class="sidebar-label">Historial</span></a>
+          <a class="sidebar-tool" href="#manifests" data-page="manifests"
+            aria-label="Manifiestos" title="Manifiestos">{{icon('manifest')}}<span class="sidebar-label">Manifiestos</span></a>
+          <a class="sidebar-tool" href="#guide" data-page="guide" aria-label="Guía de uso" title="Guía de uso">
+            {{icon('help')}}<span class="sidebar-label">Guía de uso</span></a>
+        </nav>
+        <nav id="file-tools" class="sidebar-nav file-tools" aria-label="Vistas del archivo" hidden></nav>
+      </div>
+      <div class="sidebar-footer">
+        <button id="sidebar-toggle" class="sidebar-tool sidebar-pin" type="button" aria-pressed="false"
+          aria-controls="sidebar-tools" aria-label="Fijar barra lateral" title="Fijar barra lateral">
+          {{icon('sidebar')}}<span class="sidebar-label" id="sidebar-pin-label">Fijar barra</span>
         </button>
       </div>
-    </header>
+    </aside>
+  </div>
+  <div class="app-content">
 <main id="main" class="workspace" tabindex="-1">
   <section id="page-workspace">
     <header class="page-head workspace-head">
@@ -100,6 +113,12 @@
           </div>
         </div>
       </section>
+      <aside id="intake-context" class="panel context-panel" aria-labelledby="context-title" aria-live="polite">
+        <div class="intake-head">
+          <div class="panel-label">{{icon('layers')}}<h2 id="context-title">Cómo funciona</h2></div>
+        </div>
+        <div id="intake-context-body" class="context-body"></div>
+      </aside>
     </div>
         <div id="upload-message" class="notice" role="status" hidden></div>
         <div id="progress-box" class="panel progress-box" hidden>
@@ -414,6 +433,123 @@
           </section>
         </div>
       </section>
+      <section id="page-investigations" hidden>
+        <header class="page-head workspace-head">
+          <div>
+            <h1 tabindex="-1">Investigaciones</h1>
+            <p>Organiza expedientes persistentes con análisis, comparaciones, cronologías y paquetes portables.</p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button id="inv-open-import" class="button subtle" type="button">{{icon('upload')}} Importar paquetes</button>
+            <button id="inv-open-create" class="button primary" type="button">{{icon('plus')}} Nueva investigación</button>
+          </div>
+        </header>
+
+        <section id="inv-create-panel" class="panel lab-panel inv-drawer" hidden>
+          <div class="duel-section-head">
+            <h2>Crear nueva investigación</h2>
+            <button id="inv-create-cancel" class="button icon-button" type="button" aria-label="Cerrar formulario">{{icon('x')}}</button>
+          </div>
+          <form id="inv-create-form" class="inv-form">
+            <div class="compare-grid">
+              <label class="field-group">
+                <span class="small"><strong>Nombre de la investigación *</strong></span>
+                <input id="inv-new-name" class="text-input" type="text" required maxlength="200" placeholder="Ej. Revisión de entregas del módulo 3">
+              </label>
+              <label class="field-group">
+                <span class="small"><strong>Responsable (nombre completo) *</strong></span>
+                <input id="inv-new-responsible" class="text-input" type="text" required maxlength="160" placeholder="Ej. Dra. Elena Vargas">
+              </label>
+            </div>
+            <label class="field-group">
+              <span class="small muted">Descripción u objetivo (opcional)</span>
+              <textarea id="inv-new-description" class="hash-input" rows="2" maxlength="4000" placeholder="Alcance, propósito o contexto de la revisión"></textarea>
+            </label>
+            <div class="compare-grid">
+              <label class="field-group">
+                <span class="small muted">Tipo de investigación</span>
+                <select id="inv-new-kind">
+                  <option value="document_analysis" selected>Análisis documental</option>
+                  <option value="integrity_verification">Verificación de integridad</option>
+                  <option value="exploratory_forensic">Análisis forense exploratorio</option>
+                </select>
+              </label>
+              <label class="field-group">
+                <span class="small muted">Clasificación (informativa)</span>
+                <select id="inv-new-classification">
+                  <option value="private" selected>Privada (informativa)</option>
+                  <option value="confidential">Confidencial (informativa)</option>
+                </select>
+              </label>
+            </div>
+            <p class="small muted">Se asignará automáticamente un UUID único e inmutable y fechas UTC del reloj local. La clasificación es informativa y no aplica cifrado ni control de acceso.</p>
+            <div id="inv-create-error" class="notice" role="alert" hidden></div>
+            <div class="lab-actions">
+              <span class="small muted">* Campos obligatorios</span>
+              <div class="flex flex-wrap gap-2">
+                <button id="inv-create-close" class="button quiet" type="button">Cancelar</button>
+                <button id="inv-create-submit" class="button primary" type="submit">{{icon('case')}} Crear expediente</button>
+              </div>
+            </div>
+          </form>
+        </section>
+
+        <section id="inv-import-panel" class="panel lab-panel inv-drawer" hidden>
+          <div class="duel-section-head">
+            <div>
+              <h2>Importar investigaciones (individual o masiva)</h2>
+              <p class="small muted">Selecciona uno o varios paquetes <code>.zip</code> exportados desde otras instalaciones. Se validan individualmente y se detectan conflictos por UUID.</p>
+            </div>
+            <button id="inv-import-close" class="button icon-button" type="button" aria-label="Cerrar importación">{{icon('x')}}</button>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="inv-import-pick" class="button subtle" type="button">{{icon('upload')}} Seleccionar paquete(s) .zip</button>
+            <input id="inv-import-input" type="file" accept=".zip,application/zip" multiple hidden aria-label="Seleccionar paquetes de investigación">
+            <span id="inv-import-count" class="small muted">Ningún paquete seleccionado.</span>
+          </div>
+          <div id="inv-import-status" class="notice" role="status" hidden></div>
+          <div id="inv-import-preview" hidden></div>
+          <div id="inv-import-results" hidden></div>
+        </section>
+
+        <section class="panel table-panel">
+          <div class="table-controls flex flex-wrap items-center gap-2">
+            <h2 class="mr-auto small">Expedientes locales <span id="inv-list-count" class="muted"></span></h2>
+            <label class="search flex items-center gap-2">{{icon('search')}}<span class="sr-only">Buscar investigaciones</span><input id="inv-search" type="search" placeholder="Buscar nombre, responsable o UUID"></label>
+            <label class="sr-only" for="inv-status-filter">Filtrar por estado</label>
+            <select id="inv-status-filter">
+              <option value="">Todos los estados</option>
+              <option value="open">Abiertas</option>
+              <option value="paused">Pausadas</option>
+              <option value="closed">Cerradas</option>
+            </select>
+            <label class="sr-only" for="inv-sort">Ordenar investigaciones</label>
+            <select id="inv-sort">
+              <option value="updated_at" selected>Última actividad</option>
+              <option value="created_at">Fecha de creación</option>
+            </select>
+          </div>
+          <div id="inv-list-message" class="notice" role="status" hidden></div>
+          <div id="inv-list" class="inv-list"></div>
+        </section>
+      </section>
+
+      <section id="page-investigation" class="workbench" aria-labelledby="inv-detail-title" hidden>
+        <a href="#investigations" class="return-link">{{icon('back')}} Volver a investigaciones</a>
+        <header id="inv-detail-header" class="workbench-head inv-workbench-head"></header>
+        <div id="inv-detail-notice" class="notice" role="status" hidden></div>
+        <div id="inv-detail-action-drawer" class="panel lab-panel inv-drawer" hidden></div>
+        <div id="inv-tabs" class="subnav" role="tablist" aria-label="Secciones de la investigación">
+          <button type="button" role="tab" class="subnav-tab" data-inv-tab="summary" aria-selected="true">Resumen</button>
+          <button type="button" role="tab" class="subnav-tab" data-inv-tab="files" aria-selected="false">Archivos</button>
+          <button type="button" role="tab" class="subnav-tab" data-inv-tab="comparisons" aria-selected="false">Comparaciones</button>
+          <button type="button" role="tab" class="subnav-tab" data-inv-tab="timeline" aria-selected="false">Línea de tiempo</button>
+          <button type="button" role="tab" class="subnav-tab" data-inv-tab="notes" aria-selected="false">Observaciones</button>
+          <button type="button" role="tab" class="subnav-tab" data-inv-tab="reports" aria-selected="false">Informes</button>
+        </div>
+        <div id="inv-tab-outlet" class="inspection-body"></div>
+      </section>
+
       <section id="page-detail" class="workbench" aria-labelledby="detail-title" hidden>
         <a href="#workspace" class="return-link" data-return>{{icon('back')}} Volver a resultados</a>
         <header class="workbench-head">

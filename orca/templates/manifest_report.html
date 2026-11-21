@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'">
+  <title>Verificación de manifiesto | Orca</title>
+</head>
+<body>
+<main>
+  <h1>Informe de verificación de manifiesto de integridad</h1>
+  <dl>
+    <dt>Algoritmo</dt><dd>{{ report.manifest.algorithm }}</dd>
+    <dt>Fecha del manifiesto</dt><dd>{{ report.manifest.createdAt }}</dd>
+    <dt>Fecha de verificación</dt><dd>{{ report.verified_at }}</dd>
+    <dt>Resultado global</dt><dd>{{ {'verified':'Integridad verificada','verified_with_extra':'Verificado con archivos adicionales','mismatch':'Se detectaron discrepancias'}[report.status] }}</dd>
+  </dl>
+  <h2>Resumen</h2>
+  <ul>
+    <li>Sin cambios: {{ report.summary.unchanged }}</li>
+    <li>Modificados: {{ report.summary.modified }}</li>
+    <li>Faltantes: {{ report.summary.missing }}</li>
+    <li>Adicionales: {{ report.summary.extra }}</li>
+    <li>No analizables: {{ report.summary.unreadable }}</li>
+  </ul>
+  {% if report.warnings %}
+  <h2>Advertencias y alcance</h2>
+  <ul>{% for warning in report.warnings %}<li>{{ warning }}</li>{% endfor %}</ul>
+  {% endif %}
+  {% set labels = {'unchanged':'Sin cambios','modified':'Modificado','missing':'Faltante','extra':'Adicional','unreadable':'No analizable'} %}
+  <h2>Detalle por archivo</h2>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Ruta relativa</th>
+        <th scope="col">Estado</th>
+        <th scope="col">Hash esperado</th>
+        <th scope="col">Hash actual</th>
+        <th scope="col">Detalle</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in report.rows %}
+      <tr>
+        <td><code>{{ row.path }}</code></td>
+        <td>{{ labels.get(row.status, row.status) }}</td>
+        <td>{% if row.expected_hash %}<code>{{ row.expected_hash }}</code>{% else %}—{% endif %}</td>
+        <td>{% if row.actual_hash %}<code>{{ row.actual_hash }}</code>{% else %}—{% endif %}</td>
+        <td>{{ row.detail }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</main>
+</body>
+</html>

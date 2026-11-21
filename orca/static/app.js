@@ -2,7 +2,7 @@
 
 const $ = (id) => document.getElementById(id);
 const statusNames = {ok: "Analizado", empty: "Sin descriptivos", unsupported: "No compatible", error: "Error"};
-const pages = ["workspace", "history", "guide", "detail", "duel"];
+const pages = ["workspace", "history", "guide", "detail", "duel", "hashes", "manifests"];
 const storedId = /^[a-f0-9]{32}$/;
 const fields = {
   author: "Autor declarado", organization: "Organización", username: "Usuario", created: "Creación",
@@ -139,15 +139,16 @@ async function updatePage(presentation = {}) {
   const [name, ...ids] = location.hash.slice(1).split("/");
   const workbench = (name === "detail" && ids.length === 2 || name === "duel" && ids.length === 3)
     && ids.every((id) => storedId.test(id));
-  const current = workbench || ["history", "guide"].includes(name) ? name : "workspace";
+  const current = workbench || ["history", "guide", "hashes", "manifests", "duel"].includes(name) ? name : "workspace";
   const previous = state.page;
   state.page = current;
   state.inspection = null;
   $("file-tools").hidden = true;
   $("file-tools").replaceChildren();
   for (const page of pages) $("page-" + page).hidden = page !== current;
+  const navTarget = current === "detail" ? "workspace" : current;
   for (const item of document.querySelectorAll("[data-page]")) {
-    if (item.dataset.page === (workbench ? "workspace" : current)) item.setAttribute("aria-current", "page");
+    if (item.dataset.page === navTarget) item.setAttribute("aria-current", "page");
     else item.removeAttribute("aria-current");
   }
   if (!workbench) {
@@ -156,6 +157,11 @@ async function updatePage(presentation = {}) {
     if (current === "workspace" && trigger?.isConnected && !trigger.closest("[hidden]")) trigger.focus();
     else if (previous && previous !== current) focusHeading(current);
     if (current === "history") loadHistory();
+    if (current === "duel") renderDuelHub();
+    if (current === "hashes") {
+      if (ids[0] && ["calc", "compare", "history"].includes(ids[0])) setHashTab(ids[0]);
+      else if (hashLabState.tab === "history") loadHashHistory();
+    }
     return;
   }
 
@@ -771,6 +777,8 @@ document.querySelector(".skip").addEventListener("click", (event) => {
   $("main").focus();
 });
 window.addEventListener("hashchange", () => updatePage());
+initHashLab();
+initManifests();
 renderResults(null);
 updatePage();
 checkEngine();

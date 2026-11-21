@@ -3,6 +3,8 @@
 @source "../orca/static/app.js";
 @source "../orca/static/inspection.js";
 @source "../orca/static/timeline-summary.js";
+@source "../orca/static/hash-lab.js";
+@source "../orca/static/manifests.js";
 
 @theme {
   --font-sans: Inter, "Aptos", system-ui, sans-serif;
@@ -405,3 +407,80 @@ dialog::backdrop { background: var(--backdrop); }
 .timeline-point-readout ul, .timeline-unplaced { margin-top: 4px; }
 .timeline-point-readout li, .timeline-unplaced li { display: flex; flex-wrap: wrap; gap: 3px 11px; padding-block: 3px; overflow-wrap: anywhere; }
 .timeline-empty { padding: 10px 0; }
+
+/* Sub-navigation tabs for Hash Lab & Manifests */
+.subnav { display: inline-flex; flex-wrap: wrap; gap: 3px; padding: 4px; margin-bottom: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--wash); }
+.subnav-tab { min-height: 34px; padding: 6px 13px; border: 1px solid transparent; border-radius: 6px; color: var(--muted); font-size: .875rem; font-weight: 600; background: transparent; }
+.subnav-tab:hover { color: var(--text); }
+.subnav-tab[aria-selected="true"] { color: var(--accent); background: var(--surface); border-color: var(--tint-line); }
+
+/* Hash Lab & Manifest panels */
+.lab-panel { padding: 16px 18px; display: grid; gap: 14px; }
+.lab-head h2 { margin-bottom: 3px; }
+.drop-compact { min-height: 148px; }
+.lab-file-meta { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 14px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--wash); }
+.algo-fieldset { border: 1px solid var(--line); border-radius: 7px; padding: 10px 13px 12px; margin: 0; }
+.algo-fieldset legend { padding: 0 5px; }
+.algo-checks { display: flex; flex-wrap: wrap; gap: 10px 18px; }
+.lab-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; padding-top: 6px; border-top: 1px solid var(--line); }
+.hash-results { display: grid; gap: 10px; }
+.hash-result-card, .hash-history-row { padding: 11px 13px; border: 1px solid var(--line); border-radius: 7px; background: var(--wash); display: grid; gap: 7px; }
+.hash-result-head, .hash-history-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
+.hash-digest-code { display: block; padding: 7px 9px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); color: var(--text); font-size: .82rem; overflow-wrap: anywhere; word-break: break-all; }
+.hash-inline { font-size: .78rem; overflow-wrap: anywhere; word-break: break-all; }
+.hash-history-controls { padding: 0; }
+.hash-history-row + .hash-history-row { margin-top: 8px; }
+
+.compare-controls { display: flex; align-items: end; flex-wrap: wrap; gap: 10px 12px; }
+.compare-grid, .duel-hub-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.field-group { display: grid; gap: 5px; min-width: 0; }
+.field-label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.small-btn { min-height: 28px; padding: 3px 8px; font-size: .8rem; }
+.hash-input { width: 100%; min-height: 62px; padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--text); font-size: .84rem; resize: vertical; overflow-wrap: anywhere; }
+.hash-input:focus { border-color: var(--accent); outline: 2px solid var(--accent); outline-offset: 1px; }
+.error-text { color: var(--error); }
+.compare-result, .verify-banner { padding: 12px 14px; border: 1px solid var(--line); border-radius: 7px; background: var(--wash); display: grid; gap: 5px; }
+.compare-result[data-match="yes"], .verify-banner[data-state="verified"] { background: var(--success-bg); border-color: var(--success-line); color: var(--success); }
+.compare-result[data-match="no"], .verify-banner[data-state="changed"], .verify-banner[data-state="error"] { background: var(--error-bg); border-color: var(--error-line); color: var(--error); }
+.verify-banner[data-state="warning"] { background: var(--warning-bg); border-color: var(--warning-line); color: var(--warning); }
+
+.verify-steps { display: grid; gap: 12px; }
+.verify-step { display: grid; gap: 7px; padding: 11px 13px; border: 1px solid var(--line); border-radius: 7px; background: var(--wash); }
+.manifest-stats { border-block: 1px solid var(--line); padding: 9px 0; }
+
+/* Deep comparison & Similarity indicator */
+.similarity-card, .duel-section { padding: 15px 17px; display: grid; gap: 12px; }
+.similarity-head { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; }
+.similarity-headline { font-size: 1.24rem; margin-top: 2px; }
+.similarity-percent { font-size: clamp(1.55rem, 3vw, 2.1rem); font-weight: 720; color: var(--accent); font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+.similarity-bar { height: 7px; border-radius: 999px; background: var(--wash); border: 1px solid var(--line); overflow: hidden; }
+.similarity-bar-fill { height: 100%; background: var(--accent); border-radius: 999px; }
+.similarity-dimensions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.similarity-dim { padding: 10px 11px; border: 1px solid var(--line); border-radius: 7px; background: var(--wash); display: grid; gap: 6px; align-content: start; }
+.similarity-dim-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.similarity-mini-bar { height: 4px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.similarity-mini-fill { height: 100%; background: var(--accent); border-radius: 999px; }
+.similarity-method-body { display: grid; gap: 7px; padding-top: 4px; }
+
+.duel-section-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
+.slide-diff-list { display: grid; gap: 8px; }
+.slide-diff-summary { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 10px; }
+.slide-diff-title { font-weight: 620; }
+.slide-diff-body { display: grid; gap: 8px; padding-top: 6px; }
+.diff-text-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.diff-text-col { padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--wash); display: grid; gap: 4px; align-content: start; }
+.diff-inline-box { padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); display: grid; gap: 4px; }
+.diff-inline { font-size: .88rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.diff-del { background: var(--error-bg); color: var(--error); text-decoration: line-through; padding: 0 3px; border-radius: 3px; }
+.diff-ins { background: var(--success-bg); color: var(--success); text-decoration: none; font-weight: 600; padding: 0 3px; border-radius: 3px; }
+
+@media (max-width: 950px) {
+  .similarity-dimensions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+  .compare-grid, .duel-hub-grid, .diff-text-pair { grid-template-columns: 1fr; }
+}
+@media (max-width: 540px) {
+  .similarity-dimensions { grid-template-columns: 1fr; }
+  .lab-panel, .similarity-card, .duel-section { padding: 12px; }
+}

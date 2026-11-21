@@ -316,10 +316,311 @@ function compareTable(rows) {
   return table;
 }
 
+const slideStatusLabels = {
+  identical: "Idéntica",
+  modified: "Contenido modificado",
+  reordered: "Reordenada",
+  added: "Agregada",
+  removed: "Eliminada",
+};
+
+function formatPercent(val) {
+  return new Intl.NumberFormat("es", {maximumFractionDigits: 1}).format(val) + "%";
+}
+
+function similaritySection(similarity) {
+  if (!similarity) return null;
+  const card = element("section", "panel similarity-card");
+  const head = element("div", "similarity-head");
+  if (similarity.overall_available) {
+    const pct = similarity.overall;
+    const scoreBox = element("div", "similarity-score-wrap",
+      element("p", "small muted", "Similitud documental · Algoritmo v" + similarity.algorithm_version),
+      element("h2", "similarity-headline", similarity.label));
+    const big = element("span", "similarity-percent mono", formatPercent(pct));
+    head.append(scoreBox, big);
+    card.append(head);
+    const bar = element("div", "similarity-bar",
+      element("div", "similarity-bar-fill"));
+    bar.setAttribute("role", "progressbar");
+    bar.setAttribute("aria-label", "Similitud documental");
+    bar.setAttribute("aria-valuemin", "0");
+    bar.setAttribute("aria-valuemax", "100");
+    bar.setAttribute("aria-valuenow", String(pct));
+    bar.firstChild.style.width = Math.max(0, Math.min(100, pct)) + "%";
+    card.append(bar);
+  } else {
+    head.append(element("div", "similarity-score-wrap",
+      element("p", "small muted", "Similitud documental"),
+      element("h2", "similarity-headline", similarity.label)));
+    card.append(head);
+  }
+
+  const dimGrid = element("div", "similarity-dimensions");
+  for (const id of ["text", "media", "structure", "metadata"]) {
+    const dim = similarity.dimensions?.[id];
+    if (!dim) continue;
+    const item = element("div", "similarity-dim",
+      element("div", "similarity-dim-top",
+        element("span", "small", dim.label),
+        element("strong", "mono", dim.available ? formatPercent(dim.percentage) : "No analizado")),
+      element("p", "small muted", dim.reason));
+    if (dim.available) {
+      const mini = element("div", "similarity-mini-bar", element("div", "similarity-mini-fill"));
+      mini.firstChild.style.width = Math.max(0, Math.min(100, dim.percentage)) + "%";
+      item.insertBefore(mini, item.lastChild);
+    }
+    dimGrid.append(item);
+  }
+  card.append(dimGrid);
+
+  if (similarity.significant_changes?.length) {
+    card.append(element("div", "inspection-callout",
+      element("strong", "small", "Elementos relevantes modificados"),
+      element("ul", "duel-notes small", ...similarity.significant_changes.map((c) => element("li", "", c)))));
+  }
+
+  if (similarity.not_analyzed?.length) {
+    card.append(element("p", "small muted", "Dimensiones no analizadas: " + similarity.not_analyzed.join(", ") + "."));
+  }
+
+  for (const warn of similarity.warnings || []) {
+    card.append(element("p", "notice small", warn));
+  }
+
+  const methodBody = element("div", "similarity-method-body",
+    element("p", "small", similarity.methodology.summary));
+  if (similarity.methodology.effective_weights && Object.keys(similarity.methodology.effective_weights).length) {
+    const labels = {text: "Contenido textual", media: "Recursos multimedia", structure: "Estructura", metadata: "Metadatos descriptivos"};
+    methodBody.append(element("ul", "duel-notes small muted",
+      ...Object.entries(similarity.methodology.effective_weights).map(([k, w]) =>
+        element("li", "", (labels[k] || k) + ": peso efectivo " + formatPercent(w * 100)))));
+  }
+  if (similarity.methodology.caveats?.length) {
+    methodBody.append(element("ul", "duel-notes small muted",
+      ...similarity.methodology.caveats.map((c) => element("li", "", c))));
+  }
+  card.append(element("details", "similarity-method",
+    element("summary", "small", "Metodología, ponderaciones y limitaciones"), methodBody));
+  return card;
+}
+
+function binaryIdentitySection(binary, result) {
+  if (!binary) return null;
+  const box = element("section", "panel duel-section");
+  const badge = element("span", "status",
+    binary.status === "identical" ? "Bytes idénticos" : binary.status === "different" ? "Bytes distintos" : "Sin confirmar");
+  if (binary.status === "identical") badge.dataset.status = "ok";
+  else if (binary.status === "different") badge.dataset.status = "unsupported";
+
+  const delta = binary.size_delta === null || binary.size_delta === undefined
+    ? "—"
+    : binary.size_delta === 0
+      ? "Sin diferencia (mismo tamaño)"
+      : (binary.size_delta > 0 ? "+" : "") + numbers.format(binary.size_delta) + " B";
+
+  const head = element("div", "duel-section-head",
+    element("div", "flex items-center gap-2 flex-wrap", element("h2", "", "A. Identidad binaria"), badge));
+  if (result.a.sha256 || result.b.sha256) {
+    head.append(button("Comparar hashes en Laboratorio", () => {
+      openHashComparator(result.a.sha256 || "", result.b.sha256 || "", "SHA-256");
+    }, "subtle"));
+  }
+  box.append(
+    head,
+    element("p", "", binary.verdict),
+    element("p", "small muted",
+      "Tamaño A: " + (binary.size_a !== null ? formatBytes(binary.size_a) + " (" + numbers.format(binary.size_a) + " B)" : "—")
+      + " · Tamaño B: " + (binary.size_b !== null ? formatBytes(binary.size_b) + " (" + numbers.format(binary.size_b) + " B)" : "—")
+      + " · Diferencia: " + delta),
+    element("ul", "duel-notes small muted", ...(binary.notes || []).map((n) => element("li", "", n))),
+  );
+  return box;
+}
+
+function renderDiffSegments(segments) {
+  const wrap = element("p", "diff-inline");
+  for (const seg of segments || []) {
+    if (seg.op === "delete") wrap.append(element("del", "diff-del", seg.text));
+    else if (seg.op === "insert") wrap.append(element("ins", "diff-ins", seg.text));
+    else wrap.append(document.createTextNode(seg.text));
+  }
+  return wrap;
+}
+
+function slideTitleLabel(slide) {
+  let num;
+  if (slide.slide_a && slide.slide_b && slide.slide_a !== slide.slide_b) {
+    num = "Diapositiva " + slide.slide_a + " → " + slide.slide_b;
+  } else if (slide.slide_a) {
+    num = "Diapositiva " + slide.slide_a;
+  } else {
+    num = "Diapositiva " + slide.slide_b + " (B)";
+  }
+  return num + " — " + (slideStatusLabels[slide.status] || slide.status);
+}
+
+function deepDiffSection(content, similarity) {
+  if (!content) return null;
+  const box = element("section", "panel duel-section");
+  const head = element("div", "duel-section-head",
+    element("h2", "", "B. Diferencias profundas de contenido"));
+  box.append(head);
+
+  if (content.status !== "analyzed") {
+    box.append(element("p", "muted", content.reason || "No se pudo realizar el análisis profundo de contenido."));
+    if (content.limitations?.length) {
+      box.append(element("ul", "duel-notes small muted", ...content.limitations.map((l) => element("li", "", l))));
+    }
+    return box;
+  }
+
+  const cs = content.summary;
+  const stats = element("div", "stats",
+    ...[
+      ["Diapositivas A / B", cs.slide_count_a + " / " + cs.slide_count_b],
+      ["Idénticas", numbers.format(cs.identical_slides)],
+      ["Modificadas", numbers.format(cs.modified_slides)],
+      ["Reordenadas", numbers.format(cs.reordered_slides)],
+      ["Agregadas", numbers.format(cs.added_slides)],
+      ["Eliminadas", numbers.format(cs.removed_slides)],
+    ].map(([label, val]) => element("div", "stat", element("strong", "", String(val)), element("span", "", label))));
+  box.append(stats);
+
+  if (similarity?.metadata_only_change) {
+    box.append(element("p", "inspection-callout small",
+      "Diferencias exclusivamente relacionadas con metadatos: todas las diapositivas y recursos multimedia extraídos coinciden."));
+  } else if (similarity?.non_substantive_only) {
+    box.append(element("p", "inspection-callout small",
+      "Modificaciones sin impacto sustancial en el contenido extraído (p. ej. serialización XML, IDs internos o recompresión)."));
+  }
+
+  const filter = element("select", "");
+  filter.setAttribute("aria-label", "Filtrar diferencias por diapositiva");
+  const hasNonIdentical = content.slides.some((s) => s.status !== "identical");
+  filter.append(
+    new Option("Solo cambios (" + content.slides.filter((s) => s.status !== "identical").length + ")", "changes"),
+    new Option("Todas las diapositivas (" + content.slides.length + ")", ""),
+    ...Object.entries(slideStatusLabels).map(([k, label]) =>
+      new Option(label + " (" + content.slides.filter((s) => s.status === k).length + ")", k)),
+  );
+  filter.value = hasNonIdentical ? "changes" : "";
+
+  const listHost = element("div", "slide-diff-list");
+  let showAll = false;
+
+  const renderSlides = () => {
+    const filtered = content.slides.filter((s) => {
+      if (!filter.value) return true;
+      if (filter.value === "changes") return s.status !== "identical";
+      return s.status === filter.value;
+    });
+    if (!filtered.length) {
+      listHost.replaceChildren(element("p", "small muted", "No hay diapositivas que coincidan con este filtro."));
+      return;
+    }
+    const limit = showAll ? filtered.length : 12;
+    const visible = filtered.slice(0, limit);
+    const items = visible.map((slide, idx) => {
+      const badge = element("span", "status", slideStatusLabels[slide.status] || slide.status);
+      if (slide.status === "identical") badge.dataset.status = "ok";
+      else if (slide.status === "modified" || slide.status === "reordered") badge.dataset.status = "unsupported";
+      else if (slide.status === "removed" || slide.status === "added") badge.dataset.status = "error";
+
+      const summary = element("summary", "slide-diff-summary",
+        element("span", "slide-diff-title", slideTitleLabel(slide) + (slide.title ? " · " + slide.title : "")),
+        badge);
+      const body = element("div", "slide-diff-body");
+      if (slide.change_summary?.length) {
+        body.append(element("p", "small muted", slide.change_summary.join(" · ")));
+      }
+      if (slide.text_diff && (slide.text_diff.text_a || slide.text_diff.text_b)) {
+        const pair = element("div", "diff-text-pair",
+          element("div", "diff-text-col", element("strong", "small muted", "Archivo A"),
+            element("p", "metadata-value small", slide.text_diff.text_a || "—")),
+          element("div", "diff-text-col", element("strong", "small muted", "Archivo B"),
+            element("p", "metadata-value small", slide.text_diff.text_b || "—")));
+        body.append(pair);
+        if (slide.text_diff.segments?.length && slide.status === "modified") {
+          body.append(element("div", "diff-inline-box",
+            element("span", "small muted", "Texto eliminado y agregado:"),
+            renderDiffSegments(slide.text_diff.segments)));
+        }
+      } else if (slide.status === "identical") {
+        body.append(element("p", "small muted", "El texto normalizado, los recursos multimedia y la estructura de esta diapositiva coinciden."));
+      } else if (slide.text_identical) {
+        body.append(element("p", "small muted", "El texto de esta diapositiva coincide exactamente."));
+      }
+
+      if (slide.media_diff) {
+        const m = slide.media_diff;
+        const msg = m.replaced
+          ? "Imágenes o recursos sustituidos en esta diapositiva (" + m.removed_hashes.length + " retirado(s), " + m.added_hashes.length + " nuevo(s))."
+          : "Recursos multimedia modificados (" + m.removed_hashes.length + " eliminado(s), " + m.added_hashes.length + " agregado(s)).";
+        body.append(element("p", "small", msg));
+      }
+
+      if (slide.structural_changes?.length) {
+        body.append(element("ul", "duel-notes small muted",
+          ...slide.structural_changes.map((ch) =>
+            element("li", "", ch.label + ": " + display(ch.before) + " → " + display(ch.after)))));
+      }
+
+      const details = element("details", "slide-diff-item", summary, body);
+      details.open = slide.status !== "identical" && idx < 4;
+      return details;
+    });
+    if (filtered.length > limit) {
+      items.push(button("Mostrar todas las diapositivas (" + filtered.length + ")", () => {
+        showAll = true;
+        renderSlides();
+      }, "subtle"));
+    }
+    listHost.replaceChildren(...items);
+  };
+  filter.addEventListener("change", () => { showAll = false; renderSlides(); });
+  renderSlides();
+
+  box.append(element("div", "duel-filters", filter), listHost);
+
+  // Media assets summary
+  const media = content.media;
+  if (media && (media.identical.length || media.replaced.length || media.added.length || media.removed.length)) {
+    const mediaBox = element("details", "",
+      element("summary", "small",
+        "Recursos multimedia e imágenes (idénticos " + media.identical.length
+        + " · sustituidos " + media.replaced.length
+        + " · agregados " + media.added.length
+        + " · eliminados " + media.removed.length + ")"));
+    mediaBox.open = Boolean(media.replaced.length || media.added.length || media.removed.length);
+    const list = element("ul", "duel-notes small");
+    for (const item of media.replaced) {
+      list.append(element("li", "",
+        "Diapositiva " + item.slide_a + " → " + item.slide_b + ": imagen/recurso sustituido (" + item.removed_hashes.length + " retirado(s), " + item.added_hashes.length + " nuevo(s))."));
+    }
+    for (const item of media.added) {
+      list.append(element("li", "",
+        "Agregado en B: " + item.part + " (" + formatBytes(item.size) + ", SHA-256 " + item.sha256.slice(0, 12) + "…)"));
+    }
+    for (const item of media.removed) {
+      list.append(element("li", "",
+        "Eliminado de A: " + item.part + " (" + formatBytes(item.size) + ", SHA-256 " + item.sha256.slice(0, 12) + "…)"));
+    }
+    for (const item of media.identical) {
+      list.append(element("li", "muted",
+        "Recurso idéntico (" + formatBytes(item.size) + ", SHA-256 " + item.sha256.slice(0, 12) + "…)"));
+    }
+    mediaBox.append(list);
+    box.append(mediaBox);
+  }
+
+  return box;
+}
+
 function renderDuel(result, url, presentation) {
   const body = $("duel-body");
   const filter = element("select", "");
-  filter.setAttribute("aria-label", "Filtrar diferencias");
+  filter.setAttribute("aria-label", "Filtrar diferencias de metadatos");
   filter.append(new Option("Todos los resultados", ""),
     ...Object.entries(comparisonLabels).map(([key, [, label]]) => new Option(label, key)));
   const technical = element("input", "");
@@ -342,16 +643,76 @@ function renderDuel(result, url, presentation) {
   const swap = button("Intercambiar A y B", () => enterWorkbench("duel",
     [result.session_id, result.b.id, result.a.id], {replace: true, focusSwap: true, filter: filter.value,
       technical: technical.checked}));
-  body.replaceChildren(element("div", "duel-pair", compareSide("Archivo A", result.a), compareSide("Archivo B", result.b)),
-    element("div", "flex flex-wrap gap-2", swap,
-      link("Descargar comparación JSON", url + "&download=true", "button subtle"),
-      link("Descargar informe HTML", url + "&download=true&format=html", "button subtle")),
-    summary, ...(result.notes.length ? [element("ul", "duel-notes small muted",
+
+  const metadataSection = element("section", "panel duel-section",
+    element("div", "duel-section-head", element("h2", "", "C. Comparación de metadatos")),
+    ...(result.metadata_comparison?.note ? [element("p", "small muted", result.metadata_comparison.note)] : []),
+    summary,
+    ...(result.notes.length ? [element("ul", "duel-notes small muted",
       ...result.notes.map((note) => element("li", "", note)))] : []),
     element("div", "duel-filters", filter, element("label", "check flex items-center gap-2", technical, "Incluir técnicos")),
     table);
+
+  const blocks = [
+    element("div", "duel-pair", compareSide("Archivo A", result.a), compareSide("Archivo B", result.b)),
+    element("div", "flex flex-wrap gap-2", swap,
+      link("Descargar comparación JSON", url + "&download=true", "button subtle"),
+      link("Descargar informe HTML", url + "&download=true&format=html", "button subtle")),
+  ];
+  const simCard = similaritySection(result.similarity);
+  if (simCard) blocks.push(simCard);
+  const binCard = binaryIdentitySection(result.binary_identity, result);
+  if (binCard) blocks.push(binCard);
+  const diffCard = deepDiffSection(result.content_comparison, result.similarity);
+  if (diffCard) blocks.push(diffCard);
+  blocks.push(metadataSection);
+
+  body.replaceChildren(...blocks);
   update();
   return swap;
+}
+
+function renderDuelHub() {
+  const body = $("duel-body");
+  const panel = element("section", "panel lab-panel");
+  panel.append(
+    element("h2", "", "Iniciar un duelo de documentos"),
+    element("p", "small muted", "Compara identidad binaria, contenido profundo (PPTX) y metadatos de dos archivos."));
+
+  if (state.session && state.session.files.length >= 2) {
+    const selA = element("select", "");
+    const selB = element("select", "");
+    selA.setAttribute("aria-label", "Archivo A");
+    selB.setAttribute("aria-label", "Archivo B");
+    for (const file of state.session.files) {
+      selA.append(new Option(file.name + " (" + display(file.format) + ")", file.id));
+      selB.append(new Option(file.name + " (" + display(file.format) + ")", file.id));
+    }
+    selB.selectedIndex = 1;
+    const err = element("p", "small error-text");
+    err.hidden = true;
+    const go = button("Comparar archivos seleccionados", () => {
+      if (selA.value === selB.value) {
+        err.textContent = "Selecciona dos archivos distintos de la sesión.";
+        err.hidden = false;
+        return;
+      }
+      enterWorkbench("duel", [state.session.id, selA.value, selB.value]);
+    }, "primary");
+    panel.append(
+      element("div", "duel-hub-grid",
+        element("label", "field-group", element("span", "small muted", "Archivo A (sesión actual)"), selA),
+        element("label", "field-group", element("span", "small muted", "Archivo B (sesión actual)"), selB)),
+      err,
+      element("div", "flex flex-wrap gap-2", go, link("Ir a la tabla de archivos", "#workspace", "button subtle")));
+  } else {
+    panel.append(
+      element("p", "muted", "Carga al menos dos archivos en el Analizador para compararlos en un duelo, o abre una sesión guardada en Historial."),
+      element("div", "flex flex-wrap gap-2",
+        link("Ir al Analizador", "#workspace", "button primary"),
+        link("Abrir Historial", "#history", "button subtle")));
+  }
+  body.replaceChildren(panel);
 }
 
 async function loadDuel(sessionId, first, second, route, presentation) {

@@ -13,6 +13,8 @@
   <link rel="stylesheet" href="/static/app.css">
   <script defer src="/static/timeline-summary.js"></script>
   <script defer src="/static/inspection.js"></script>
+  <script defer src="/static/hash-lab.js"></script>
+  <script defer src="/static/manifests.js"></script>
   <script defer src="/static/app.js"></script>
 </head>
 <body>
@@ -30,9 +32,15 @@
     <div id="sidebar-tools" class="sidebar-tools">
       <nav class="app-nav sidebar-nav" aria-label="Principal">
         <a class="sidebar-tool" href="#workspace" data-page="workspace" aria-current="page"
-          aria-label="Inspector" title="Inspector">{{icon('scan')}}<span class="sidebar-label">Inspector</span></a>
+          aria-label="Analizador de archivos" title="Analizador de archivos">{{icon('scan')}}<span class="sidebar-label">Analizador</span></a>
+        <a class="sidebar-tool" href="#duel" data-page="duel"
+          aria-label="Duelo de documentos" title="Duelo de documentos">{{icon('compare')}}<span class="sidebar-label">Duelo</span></a>
+        <a class="sidebar-tool" href="#hashes" data-page="hashes"
+          aria-label="Laboratorio de hashes" title="Laboratorio de hashes">{{icon('hash')}}<span class="sidebar-label">Laboratorio de hashes</span></a>
         <a class="sidebar-tool" href="#history" data-page="history" aria-label="Historial" title="Historial">
           {{icon('history')}}<span class="sidebar-label">Historial</span></a>
+        <a class="sidebar-tool" href="#manifests" data-page="manifests"
+          aria-label="Manifiestos de integridad" title="Manifiestos de integridad">{{icon('manifest')}}<span class="sidebar-label">Manifiestos</span></a>
         <a class="sidebar-tool" href="#guide" data-page="guide" aria-label="Guía de uso" title="Guía de uso">
           {{icon('help')}}<span class="sidebar-label">Guía de uso</span></a>
       </nav>
@@ -173,16 +181,238 @@
         </section>
       </section>
       <section id="page-guide" hidden>
-        <header class="page-head"><h1 tabindex="-1">Guía de uso</h1><p>Cómo interpretar los campos y verificar una copia saneada.</p></header>
+        <header class="page-head"><h1 tabindex="-1">Guía de uso</h1><p>Cómo interpretar metadatos, similitud documental, hashes y manifiestos de integridad.</p></header>
         <section class="panel guide">
-          <h2>Inspección</h2>
-          <p>Selecciona archivos propios, abre un resultado y consulta el campo original de cada valor normalizado. Una coincidencia indica que el valor aparece en varios archivos. La autoría, el entorno y el significado requieren comprobación independiente.</p>
+          <h2>Inspección y comparación profunda</h2>
+          <p>Selecciona archivos propios, abre un resultado y consulta el campo original de cada valor normalizado. En <strong>Duelo de documentos</strong>, Orca evalúa tres dimensiones independientes: identidad binaria (SHA-256 y tamaño), similitud profunda de contenido (actualmente para PPTX: texto por diapositiva, orden, imágenes/multimedia y estructura) y comparación de metadatos descriptivos y técnicos.</p>
+          <p>La similitud documental para PPTX combina contenido textual (50%), recursos multimedia (25%), estructura (15%) y metadatos descriptivos (10%), redistribuyendo de forma proporcional las dimensiones no aplicables. Las etiquetas técnicas se excluyen del porcentaje de metadatos y nunca se emite un porcentaje global para formatos sin analizador de contenido. Una similitud alta no implica equivalencia visual ni funcional.</p>
+          <h2>Laboratorio de hashes y manifiestos</h2>
+          <p>Calcula hashes MD5, SHA-1, SHA-256 (predeterminado) y SHA-512 mediante lectura en bloques sin cargar el archivo completo en memoria. MD5 y SHA-1 son algoritmos heredados y no deben utilizarse como garantía criptográfica moderna frente a colisiones. El historial de hashes guarda únicamente registros ligeros en SQLite (sin copias de archivos) y permite verificar archivos nuevamente.</p>
+          <p>Los <strong>Manifiestos de integridad</strong> generan y verifican archivos JSON con rutas relativas normalizadas y hashes. Un manifiesto verifica integridad respecto a esa referencia, pero no autenticidad, ya que un JSON sin firma digital puede modificarse.</p>
           <h2>Limpieza por formato</h2>
           <dl>{% for kind, policy in policies.items() %}<div><dt>{{ kind }}</dt><dd>{{ policy }}</dd></div>{% endfor %}<div><dt>WebP</dt><dd>Disponible para inspección.</dd></div></dl>
           <p>La limpieza comprueba los metadatos que ExifTool puede leer. También pueden existir datos en el texto, en revisiones, en perfiles o en archivos incrustados. Los PDF cifrados y los archivos con firmas detectadas o macros no se limpian.</p>
           <h2>Retención</h2>
-          <p>Los archivos originales y las copias de descarga son temporales. Se eliminan al cerrar la sesión o al terminar la retención de {{ minutes }} min. Las sesiones guardadas en SQLite se pueden eliminar desde Historial. Descarga la copia antes de cerrar la sesión.</p>
+          <p>Los archivos originales y las copias de descarga son temporales. Se eliminan al cerrar la sesión o al terminar la retención de {{ minutes }} min. Las sesiones guardadas y el historial de hashes en SQLite se pueden eliminar desde Historial o el Laboratorio. Descarga la copia antes de cerrar la sesión.</p>
         </section>
+      </section>
+      <section id="page-hashes" hidden>
+        <header class="page-head">
+          <h1 tabindex="-1">Laboratorio de hashes</h1>
+          <p>Calcula, compara, guarda y vuelve a verificar huellas criptográficas sin almacenar copias de tus archivos.</p>
+        </header>
+        <div class="subnav" role="tablist" aria-label="Herramientas del laboratorio de hashes">
+          <button type="button" role="tab" class="subnav-tab" data-hash-tab="calc" aria-selected="true">Calculadora</button>
+          <button type="button" role="tab" class="subnav-tab" data-hash-tab="compare" aria-selected="false">Comparador</button>
+          <button type="button" role="tab" class="subnav-tab" data-hash-tab="history" aria-selected="false">Historial de hashes</button>
+        </div>
+        <div id="hash-tab-calc" class="lab-section">
+          <section class="panel lab-panel">
+            <div class="lab-head">
+              <h2>Calculadora de hashes</h2>
+              <p class="small muted">Procesamiento local en bloques de 128 kB para archivos grandes.</p>
+            </div>
+            <div id="hash-drop" class="drop drop-compact">
+              <div class="upload-glyph">{{icon('hash')}}</div>
+              <p class="drop-title">Selecciona o arrastra un archivo</p>
+              <p class="drop-note">Puedes cambiar los algoritmos seleccionados sin volver a elegir el archivo.</p>
+              <button id="hash-pick" class="button subtle" type="button">{{icon('plus')}} Seleccionar archivo</button>
+              <input id="hash-picker" type="file" hidden aria-label="Seleccionar archivo para calcular hash">
+            </div>
+            <div id="hash-file-meta" class="lab-file-meta" hidden></div>
+            <fieldset class="algo-fieldset">
+              <legend class="small muted">Algoritmos</legend>
+              <div class="algo-checks">
+                <label class="check"><input type="checkbox" name="hash-algo" value="SHA-256" checked> SHA-256 <span class="small muted">(predeterminado)</span></label>
+                <label class="check"><input type="checkbox" name="hash-algo" value="SHA-512"> SHA-512</label>
+                <label class="check"><input type="checkbox" name="hash-algo" value="SHA-1"> SHA-1 <span class="small muted">(heredado)</span></label>
+                <label class="check"><input type="checkbox" name="hash-algo" value="MD5"> MD5 <span class="small muted">(heredado)</span></label>
+              </div>
+            </fieldset>
+            <div id="hash-legacy-warning" class="notice" hidden></div>
+            <div class="lab-actions">
+              <label class="check"><input id="hash-auto-save" type="checkbox"> Guardar resultados en el historial</label>
+              <div class="flex flex-wrap gap-2">
+                <button id="hash-cancel" class="button subtle" type="button" hidden>Cancelar</button>
+                <button id="hash-run" class="button primary" type="button" disabled>{{icon('hash')}} Calcular</button>
+              </div>
+            </div>
+            <div id="hash-calc-status" class="notice" role="status" hidden></div>
+            <div id="hash-calc-results" class="hash-results"></div>
+          </section>
+        </div>
+        <div id="hash-tab-compare" class="lab-section" hidden>
+          <section class="panel lab-panel">
+            <div class="lab-head">
+              <h2>Comparador de hashes</h2>
+              <p class="small muted">Valida formato y longitud antes de comparar. Admite mayúsculas, minúsculas y espacios accidentales alrededor.</p>
+            </div>
+            <div class="compare-controls">
+              <label class="field-group">
+                <span class="small muted">Algoritmo</span>
+                <select id="compare-algo">
+                  <option value="SHA-256" selected>SHA-256 (64 hex)</option>
+                  <option value="SHA-512">SHA-512 (128 hex)</option>
+                  <option value="SHA-1">SHA-1 (40 hex · heredado)</option>
+                  <option value="MD5">MD5 (32 hex · heredado)</option>
+                </select>
+              </label>
+              <button id="compare-swap" class="button subtle" type="button">{{icon('swap')}} Intercambiar A y B</button>
+              <button id="compare-clear" class="button quiet" type="button">Limpiar</button>
+            </div>
+            <div id="compare-legacy-warning" class="notice" hidden></div>
+            <div class="compare-grid">
+              <div class="field-group">
+                <div class="field-label-row">
+                  <label for="compare-hash-a" class="small"><strong>Hash A</strong></label>
+                  <button id="compare-copy-a" class="button quiet small-btn" type="button">{{icon('copy')}} Copiar</button>
+                </div>
+                <textarea id="compare-hash-a" class="hash-input mono" rows="2" spellcheck="false" placeholder="Pega el primer hash hexadecimal"></textarea>
+                <p id="compare-err-a" class="small error-text" hidden></p>
+              </div>
+              <div class="field-group">
+                <div class="field-label-row">
+                  <label for="compare-hash-b" class="small"><strong>Hash B</strong></label>
+                  <button id="compare-copy-b" class="button quiet small-btn" type="button">{{icon('copy')}} Copiar</button>
+                </div>
+                <textarea id="compare-hash-b" class="hash-input mono" rows="2" spellcheck="false" placeholder="Pega el segundo hash hexadecimal"></textarea>
+                <p id="compare-err-b" class="small error-text" hidden></p>
+              </div>
+            </div>
+            <div class="lab-actions">
+              <span id="compare-copy-status" class="small muted" role="status"></span>
+              <button id="compare-run" class="button primary" type="button">{{icon('check')}} Comparar hashes</button>
+            </div>
+            <div id="compare-result" class="compare-result" role="status" hidden></div>
+          </section>
+        </div>
+        <div id="hash-tab-history" class="lab-section" hidden>
+          <section class="panel lab-panel">
+            <div class="section-head flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2>Historial de hashes</h2>
+                <p class="small muted">Registros ligeros guardados en SQLite local. No se almacenan copias de los archivos originales.</p>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <details class="exports">
+                  <summary class="button subtle">{{icon('download')}} Exportar</summary>
+                  <div id="hash-history-exports">
+                    <a href="/api/hashes/history/export/json">JSON</a>
+                    <a href="/api/hashes/history/export/csv">CSV</a>
+                  </div>
+                </details>
+                <button id="hash-history-clear" class="button subtle" type="button" disabled>Limpiar historial</button>
+              </div>
+            </div>
+            <div class="table-controls hash-history-controls flex flex-wrap items-center gap-2">
+              <label class="search flex items-center gap-2">{{icon('search')}}<span class="sr-only">Buscar por nombre</span><input id="hash-history-search" type="search" placeholder="Buscar por nombre"></label>
+              <label class="sr-only" for="hash-history-algo">Filtrar por algoritmo</label>
+              <select id="hash-history-algo">
+                <option value="">Todos los algoritmos</option>
+                <option value="SHA-256">SHA-256</option>
+                <option value="SHA-512">SHA-512</option>
+                <option value="SHA-1">SHA-1</option>
+                <option value="MD5">MD5</option>
+              </select>
+            </div>
+            <div id="hash-history-status" class="notice" role="status" hidden></div>
+            <input id="hash-verify-picker" type="file" hidden aria-label="Seleccionar archivo para verificar integridad">
+            <div id="hash-verify-banner" class="verify-banner" role="status" hidden></div>
+            <div id="hash-history-list"></div>
+          </section>
+        </div>
+      </section>
+      <section id="page-manifests" hidden>
+        <header class="page-head">
+          <h1 tabindex="-1">Manifiestos de integridad</h1>
+          <p>Genera y verifica manifiestos JSON para conjuntos de archivos o carpetas locales.</p>
+        </header>
+        <div class="subnav" role="tablist" aria-label="Operaciones de manifiestos">
+          <button type="button" role="tab" class="subnav-tab" data-manifest-tab="generate" aria-selected="true">Generar manifiesto</button>
+          <button type="button" role="tab" class="subnav-tab" data-manifest-tab="verify" aria-selected="false">Verificar manifiesto</button>
+        </div>
+        <div id="manifest-tab-generate" class="lab-section">
+          <section class="panel lab-panel">
+            <div class="lab-head">
+              <h2>Generar manifiesto JSON</h2>
+              <p class="small muted">Solo se guardan rutas relativas normalizadas, tamaños y hashes; nunca contenido ni rutas absolutas.</p>
+            </div>
+            <div class="compare-controls">
+              <label class="field-group">
+                <span class="small muted">Algoritmo</span>
+                <select id="manifest-gen-algo">
+                  <option value="SHA-256" selected>SHA-256 (predeterminado)</option>
+                  <option value="SHA-512">SHA-512</option>
+                  <option value="SHA-1">SHA-1 (heredado)</option>
+                  <option value="MD5">MD5 (heredado)</option>
+                </select>
+              </label>
+              <button id="manifest-pick-files" class="button subtle" type="button">{{icon('plus')}} Seleccionar archivos</button>
+              <button id="manifest-pick-folder" class="button subtle" type="button">{{icon('folder')}} Seleccionar carpeta</button>
+              <button id="manifest-gen-clear" class="button quiet" type="button" hidden>Vaciar</button>
+              <input id="manifest-files-input" type="file" multiple hidden aria-label="Seleccionar archivos para manifiesto">
+              <input id="manifest-folder-input" type="file" webkitdirectory multiple hidden aria-label="Seleccionar carpeta para manifiesto">
+            </div>
+            <div id="manifest-gen-legacy" class="notice" hidden></div>
+            <p id="manifest-gen-selection" class="small muted">Ningún archivo seleccionado todavía.</p>
+            <div id="manifest-gen-progress" class="progress-box panel" hidden>
+              <div class="flex justify-between gap-3"><strong id="manifest-gen-progress-title">Calculando hashes…</strong><span class="mono" id="manifest-gen-progress-count"></span></div>
+              <progress id="manifest-gen-bar" max="1" value="0" aria-label="Progreso de generación de manifiesto"></progress>
+              <p id="manifest-gen-current" class="small muted"></p>
+            </div>
+            <div class="lab-actions">
+              <span class="small muted">Esquema JSON v1 determinista y ordenado por ruta relativa.</span>
+              <div class="flex flex-wrap gap-2">
+                <button id="manifest-gen-cancel" class="button subtle" type="button" hidden>Cancelar</button>
+                <button id="manifest-gen-run" class="button primary" type="button" disabled>{{icon('manifest')}} Generar manifiesto</button>
+              </div>
+            </div>
+            <div id="manifest-gen-status" class="notice" role="status" hidden></div>
+            <div id="manifest-gen-output" hidden></div>
+          </section>
+        </div>
+        <div id="manifest-tab-verify" class="lab-section" hidden>
+          <section class="panel lab-panel">
+            <div class="lab-head">
+              <h2>Verificar conjunto contra manifiesto</h2>
+              <p class="small muted">Importa un manifiesto JSON y vuelve a seleccionar los archivos o la carpeta correspondiente.</p>
+            </div>
+            <div class="verify-steps">
+              <div class="verify-step">
+                <strong class="small">1. Manifiesto de referencia (JSON)</strong>
+                <div class="flex flex-wrap items-center gap-2">
+                  <button id="manifest-import-btn" class="button subtle" type="button">{{icon('upload')}} Cargar manifiesto JSON</button>
+                  <input id="manifest-import-input" type="file" accept=".json,application/json" hidden aria-label="Cargar archivo de manifiesto JSON">
+                  <span id="manifest-import-meta" class="small muted">Ningún manifiesto cargado.</span>
+                </div>
+              </div>
+              <div class="verify-step">
+                <strong class="small">2. Archivos a verificar</strong>
+                <div class="flex flex-wrap items-center gap-2">
+                  <button id="manifest-ver-files-btn" class="button subtle" type="button">{{icon('plus')}} Seleccionar archivos</button>
+                  <button id="manifest-ver-folder-btn" class="button subtle" type="button">{{icon('folder')}} Seleccionar carpeta</button>
+                  <input id="manifest-ver-files-input" type="file" multiple hidden aria-label="Seleccionar archivos a verificar">
+                  <input id="manifest-ver-folder-input" type="file" webkitdirectory multiple hidden aria-label="Seleccionar carpeta a verificar">
+                  <span id="manifest-ver-selection" class="small muted">Ningún archivo seleccionado.</span>
+                </div>
+              </div>
+            </div>
+            <div id="manifest-ver-progress" class="progress-box panel" hidden>
+              <div class="flex justify-between gap-3"><strong id="manifest-ver-progress-title">Verificando archivos…</strong><span class="mono" id="manifest-ver-progress-count"></span></div>
+              <progress id="manifest-ver-bar" max="1" value="0" aria-label="Progreso de verificación de manifiesto"></progress>
+              <p id="manifest-ver-current" class="small muted"></p>
+            </div>
+            <div class="lab-actions">
+              <span class="small muted">Un manifiesto verifica integridad respecto al JSON, no autenticidad criptográfica.</span>
+              <div class="flex flex-wrap gap-2">
+                <button id="manifest-ver-cancel" class="button subtle" type="button" hidden>Cancelar</button>
+                <button id="manifest-ver-run" class="button primary" type="button" disabled>{{icon('check')}} Verificar integridad</button>
+              </div>
+            </div>
+            <div id="manifest-ver-status" class="notice" role="status" hidden></div>
+            <div id="manifest-ver-results" hidden></div>
+          </section>
+        </div>
       </section>
       <section id="page-detail" class="workbench" aria-labelledby="detail-title" hidden>
         <a href="#workspace" class="return-link" data-return>{{icon('back')}} Volver a resultados</a>

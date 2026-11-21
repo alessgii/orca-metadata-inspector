@@ -76,11 +76,29 @@ Abre **Detalles → Cronología**. **Resumida** traza los instantes comparables 
 
 El intervalo expresa tiempo transcurrido entre una creación y una modificación internas comparables. Cuando varias fuentes se refieren al mismo instante, se conservan todas. Si las fuentes comparables discrepan, Orca evita elegir un intervalo único. Las fechas de sistema de archivos se identifican si están presentes en los datos almacenados. El extractor actual excluye las fechas del sistema de archivos de la copia temporal para evitar atribuirlas al original. La detección usa etiquetas conocidas y, para las demás, exige un nombre temporal y un valor con formato compatible. `LinksUpToDate` se conserva como propiedad de estado en los metadatos originales y en la comparación.
 
-### Duelo de documentos
+### Duelo de documentos y comparación profunda
 
-Marca dos archivos de la misma sesión en la tabla y pulsa **Comparar archivos**. Puedes intercambiar A y B, filtrar por estado, incluir campos técnicos y descargar el resultado como JSON o HTML. En **Historial**, abre una sesión guardada para comparar sus archivos con el mismo flujo.
+Marca dos archivos de la misma sesión en la tabla y pulsa **Comparar archivos**, o entra desde **Duelo** en la barra lateral. Puedes intercambiar A y B, enviar ambos SHA-256 directamente al **Comparador de hashes**, filtrar diferencias y descargar el resultado completo en JSON o HTML.
 
-La comparación agrupa etiquetas con un significado compatible y conserva los valores registrados junto con sus fuentes. Autor, creador, último editor, herramienta de creación y productor se presentan como roles distintos. Una lista semántica se coteja por sus valores, y las listas de etiquetas técnicas conservan el orden. Una cadena vacía, un nulo y un campo ausente tienen significados distintos. Las fechas con un instante UTC equivalente pueden coincidir aunque sus representaciones difieran. En coordenadas EXIF, Orca usa la referencia de hemisferio para comparar el signo y conserva ambas etiquetas. Una magnitud sin hemisferio queda como no comparable. Las coincidencias describen valores registrados y los hashes describen las huellas calculadas.
+El duelo evalúa tres dimensiones independientes:
+
+1. **Identidad binaria:** compara los SHA-256 y la diferencia de tamaño. Aclara explícitamente que hashes distintos no implican contenidos visibles distintos y que nunca se compara similitud por caracteres del hash.
+2. **Similitud de contenido (motor extensible por formato):** actualmente implementado para **PPTX**. Analiza el orden real de diapositivas desde `ppt/presentation.xml`, normaliza textos, tablas y notas, compara recursos multimedia por SHA-256 y evalúa estructura (diseño, formas, tablas, gráficos). Identifica diapositivas idénticas, modificadas (con diferencias de texto eliminado/agregado), reordenadas, agregadas, eliminadas, imágenes sustituidas y cambios únicamente de metadatos o empaquetado. No renderiza diapositivas ni declara equivalencia visual.
+3. **Similitud de metadatos:** conserva la comparación semántica de roles, listas, fechas UTC y hemisferios EXIF, separando propiedades descriptivas de etiquetas técnicas.
+
+Para PPTX con archivos activos disponibles, Orca calcula una puntuación determinista v1.0 (**50% contenido textual, 25% recursos multimedia, 15% estructura y 10% metadatos descriptivos**, redistribuyendo proporcionalmente dimensiones no aplicables y excluyendo etiquetas técnicas). Para formatos sin analizador profundo o sesiones expiradas del historial no se emite un porcentaje global engañoso.
+
+### Laboratorio de hashes e historial
+
+En **Laboratorio de hashes** dispones de tres herramientas:
+
+- **Calculadora de hashes:** calcula MD5, SHA-1, SHA-256 (predeterminado) y SHA-512 en bloques de 128 kB sin cargar el archivo completo en memoria. Permite activar múltiples algoritmos para el mismo archivo sin volver a seleccionarlo y advierte sobre el carácter heredado de MD5 y SHA-1.
+- **Comparador de hashes:** valida formato hexadecimal y longitud antes de comparar, acepta mayúsculas/minúsculas y espacios accidentales alrededor, y aclara que la igualdad de cadenas no demuestra autenticidad por sí sola.
+- **Historial de hashes y «Verificar nuevamente»:** guarda registros ligeros en SQLite (`id`, nombre, tamaño, algoritmo, hash y fecha) sin almacenar copias de archivos. Permite buscar, filtrar, exportar a JSON/CSV, eliminar y volver a seleccionar un archivo para comprobar si su integridad se mantiene (sin usar el nombre de archivo como prueba de identidad).
+
+### Manifiestos de integridad
+
+En **Manifiestos** puedes seleccionar varios archivos o una carpeta para generar un manifiesto JSON (esquema v1) con rutas relativas normalizadas, tamaños y hashes. Al importar un manifiesto y volver a seleccionar los archivos, Orca clasifica cada elemento como **sin cambios**, **modificado**, **faltante**, **adicional** o **no analizable**, y permite exportar el resultado en JSON o HTML. Un manifiesto JSON verifica integridad respecto a esa referencia, pero no autenticidad criptográfica al no incorporar firma digital.
 
 ### Copiar como evidencia
 
@@ -157,6 +175,7 @@ La comparación coteja los campos agrupados devueltos antes y después. Los camb
 | `ORCA_DATA` | `.orca-data` del proyecto | Directorio local de trabajo e historial. Usa uno por instancia. |
 | `ORCA_UPLOAD_BYTES` | `250000000` | Tope acumulado de datos de archivo enviados, excluyendo la sobrecarga multipart. |
 | `ORCA_EXPANDED_BYTES` | `200000000` | Tope total expandido durante la validación. |
+| `ORCA_HASH_BYTES` | `1000000000` | Tope de tamaño en flujo para el Laboratorio de hashes y manifiestos. |
 | `ORCA_TIMEOUT` | `25` | Segundos por invocación de la herramienta. |
 | `ORCA_TTL` | `1800` | Segundos de retención temporal después del análisis o limpieza. |
 
@@ -170,12 +189,14 @@ Orca lee variables del entorno del proceso. Usa `export ORCA_TTL=900` en Linux o
 | `orca/uploads.py` | Cuotas, firmas binarias, validación de ZIP y Open XML, preparación de archivos. |
 | `orca/extraction.py` | Protocolo `Extractor`, adaptador ExifTool, subprocess acotado y SHA-256. |
 | `orca/analysis.py`, `orca/metadata.py` | Inspección, orígenes de campos normalizados, hallazgos, comparaciones y correlaciones. |
-| `orca/timeline.py`, `orca/duel.py` | Interpretación de fechas y comparación semántica de registros de una sesión. |
+| `orca/timeline.py`, `orca/duel.py` | Interpretación de fechas y comparación en tres dimensiones (binaria, contenido y metadatos). |
+| `orca/content.py`, `orca/similarity.py` | Motor extensible de extracción/comparación profunda (PPTX) y puntuación determinista de similitud. |
+| `orca/hashes.py`, `orca/manifests.py` | Cálculo de hashes en bloques, validación/comparación, esquema v1 y verificación de manifiestos. |
 | `orca/evidence.py`, `orca/exposure.py` | Evidencia contextual, reglas de exposición y diferencias tras limpiar. |
-| `orca/sessions.py`, `orca/storage.py` | Lotes, progreso, temporales y persistencia SQLite con dos tablas vinculadas para sesiones y documentos. |
+| `orca/sessions.py`, `orca/storage.py` | Lotes, progreso, temporales y persistencia SQLite (`analysis`, `document` y `hash_record`). |
 | `orca/cleanup.py`, `orca/rewrite.py` | Políticas por formato, reescritura, reextracción y validación de copias. |
-| `orca/reports.py`, `orca/templates/` | Informes y HTML escapado. El CSV protege contra celdas interpretadas como fórmulas. |
-| `orca/static/`, `frontend/` | Interfaz en español, Fetch, JavaScript sin framework, SVG locales y Tailwind compilado. |
+| `orca/reports.py`, `orca/templates/` | Informes y HTML escapado (sesiones, duelos y verificación de manifiestos). |
+| `orca/static/`, `frontend/` | Interfaz en español, Fetch, JavaScript sin framework (`app.js`, `inspection.js`, `hash-lab.js`, `manifests.js`), SVG locales y Tailwind compilado. |
 
 SQLite se usa mediante la biblioteca estándar para mantener la instalación ligera. El historial guarda metadatos agrupados tal como se entregan en el JSON de ExifTool. Se excluyen los campos del sistema de archivos que describirían el directorio y las marcas de tiempo temporales del servidor. Los archivos de entrada conservan su nombre y tamaño declarados en el registro de análisis, además del hash calculado cuando se leyó un archivo completo.
 
@@ -189,12 +210,21 @@ SQLite se usa mediante la biblioteca estándar para mantener la instalación lig
 | `GET /api/sessions/{id}/files/{file_id}` | JSON original, normalización con origen, hash y hallazgos. |
 | `GET /api/sessions/{id}/files/{file_id}/context` | Cronología, exposición y comparación de exposición si hay una copia vigente. |
 | `GET /api/sessions/{id}/files/{file_id}/evidence` | Evidencia. Usa `kind=raw&tag=...` o `kind=normalized`, `finding` o `exposure` con `index` desde cero en el orden del JSON. |
-| `GET /api/sessions/{id}/duel?file_a=…&file_b=…` | Comparación de dos archivos de una sesión. Usa `download=true` para descargar JSON o añade `format=html` para el informe. |
+| `GET /api/sessions/{id}/duel?file_a=…&file_b=…` | Comparación profunda en 3 dimensiones y similitud documental. Usa `download=true` para descargar JSON o añade `format=html` para el informe. |
 | `POST /api/sessions/{id}/files/{file_id}/clean` | Reescribe y verifica una copia, devuelve la diferencia y el JSON posterior. |
 | `GET /api/sessions/{id}/files/{file_id}/copy` | Descarga la copia verificada vigente. |
 | `GET /api/sessions/{id}/export/{json\|csv\|html}` | Descarga el informe. |
 | `GET /api/history`, `DELETE /api/history` | Lista o borra los resultados persistentes. |
 | `DELETE /api/sessions/{id}` | Borra una sesión, sus temporales y su entrada en el historial. |
+| `POST /api/hashes/compute` | Calcula uno o varios hashes (MD5, SHA-1, SHA-256, SHA-512) en bloques; admite stream binario o multipart y `save=1`. |
+| `POST /api/hashes/compare` | Valida formato/longitud y compara dos hashes hexadecimales en tiempo constante. |
+| `GET /api/hashes/history`, `POST /api/hashes/history` | Lista (con `q` y `algorithm`) o guarda registros ligeros de hashes en SQLite. |
+| `DELETE /api/hashes/history`, `DELETE /api/hashes/history/{id}` | Elimina un registro individual o limpia el historial de hashes. |
+| `GET /api/hashes/history/export/{json\|csv}` | Exporta el historial de hashes (CSV protegido contra fórmulas). |
+| `POST /api/hashes/history/{id}/verify` | Recalcula el hash de un archivo contra un registro guardado («Verificar nuevamente»). |
+| `POST /api/manifests/generate` | Genera y valida un manifiesto de integridad JSON v1 (acepta JSON precalculado o multipart). |
+| `POST /api/manifests/verify` | Verifica archivos contra un manifiesto JSON v1 y clasifica cambios, ausencias y adicionales. |
+| `POST /api/manifests/report` | Exporta el resultado de verificación de un manifiesto como informe HTML seguro. |
 
 ## Desarrollo y pruebas
 

@@ -1,9 +1,12 @@
+import hmac
 import json
 import unicodedata
 from collections import Counter, defaultdict
 from decimal import Decimal
 
+from .content import compare_content
 from .metadata import SEMANTIC_LABELS, interpreted_field, properties, raw_value, semantic_field, technical
+from .similarity import compute_similarity
 from .timeline import date_context, date_kind
 
 STATUSES = ("matching", "different", "only_a", "only_b", "not_comparable")
@@ -110,7 +113,41 @@ def comparable_values(items, raw, field):
     return values, uncertain
 
 
-def compare_files(first, second):
+def binary_identity_summary(first, second):
+    sha_a = first.get("sha256")
+    sha_b = second.get("sha256")
+    size_a = first.get("size")
+    size_b = second.get("size")
+    size_delta = (size_b - size_a) if isinstance(size_a, int) and isinstance(size_b, int) else None
+    if isinstance(sha_a, str) and isinstance(sha_b, str):
+        identical = hmac.compare_digest(sha_a.lower(), sha_b.lower())
+        status = "identical" if identical else "different"
+        verdict = (
+            "Los archivos son idénticos a nivel de bytes (SHA-256 coincidente)."
+            if identical else
+            "Los archivos difieren a nivel de bytes (SHA-256 distintos)."
+        )
+    else:
+        identical = None
+        status = "not_comparable"
+        verdict = "No fue posible confirmar la identidad binaria porque falta el SHA-256 de al menos un archivo."
+    return {
+        "status": status,
+        "identical_bytes": identical,
+        "sha256_a": sha_a,
+        "sha256_b": sha_b,
+        "size_a": size_a,
+        "size_b": size_b,
+        "size_delta": size_delta,
+        "verdict": verdict,
+        "notes": [
+            "Hashes SHA-256 distintos no implican necesariamente contenidos visibles distintos: cambiar metadatos, fechas o recompresión altera el hash.",
+            "No debe interpretarse ninguna coincidencia parcial de caracteres entre hashes criptográficos como un porcentaje de similitud.",
+        ],
+    }
+
+
+def compare_files(first, second, path_a=None, path_b=None, settings=None):
     a, b = entries(first), entries(second)
     rows = []
     keys = [*GENERAL, *sorted((a.keys() | b.keys()) - GENERAL.keys())]
@@ -142,6 +179,9 @@ def compare_files(first, second):
                      "explanation": explanation, "technical": all(item.get("technical") for item in left + right)})
     by_field = {row["field"]: row for row in rows}
     counts = Counter(row["status"] for row in rows)
+    descriptive_rows = [row for row in rows if row["field"] not in GENERAL and not row["technical"]]
+    technical_rows = [row for row in rows if row["technical"]]
+    descriptive_counts = Counter(row["status"] for row in descriptive_rows)
     notes = []
     if by_field["sha256"]["status"] == "matching":
         notes.append("Los archivos tienen el mismo SHA-256. Sus contenidos coinciden según la huella.")
@@ -162,6 +202,25 @@ def compare_files(first, second):
     if locations.count(True) == 1 and all(record.get("status") not in {"unsupported", "error"}
                                          for record in (first, second)):
         notes.append(f"Solo el archivo {'A' if locations[0] else 'B'} registra datos de ubicación examinados.")
-    return {"a": {key: first.get(key) for key in ("id", "name", "status", *GENERAL)},
-            "b": {key: second.get(key) for key in ("id", "name", "status", *GENERAL)},
-            "summary": {status: counts[status] for status in STATUSES}, "notes": notes, "rows": rows}
+
+    binary_identity = binary_identity_summary(first, second)
+    content = compare_content(first, second, path_a=path_a, path_b=path_b, settings=settings)
+    similarity = compute_similarity(binary_identity, content, rows)
+    metadata_comparison = {
+        "summary": {status: counts[status] for status in STATUSES},
+        "descriptive_summary": {status: descriptive_counts[status] for status in STATUSES},
+        "descriptive_count": len(descriptive_rows),
+        "technical_count": len(technical_rows),
+        "note": "Las diferencias en metadatos (autor, fechas, software, IDs) son independientes del contenido visible del documento.",
+    }
+    return {
+        "a": {key: first.get(key) for key in ("id", "name", "status", *GENERAL)},
+        "b": {key: second.get(key) for key in ("id", "name", "status", *GENERAL)},
+        "summary": {status: counts[status] for status in STATUSES},
+        "notes": notes,
+        "rows": rows,
+        "binary_identity": binary_identity,
+        "content_comparison": content,
+        "metadata_comparison": metadata_comparison,
+        "similarity": similarity,
+    }

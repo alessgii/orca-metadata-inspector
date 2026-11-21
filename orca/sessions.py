@@ -2,6 +2,7 @@ import json
 import logging
 import shutil
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -230,3 +231,24 @@ class Sessions:
             stream = path.open("rb")
             job.downloads += 1
             return stream, job, result["after"]
+
+    @contextmanager
+    def pin_sources(self, session_id, file_ids):
+        job = None
+        paths = {}
+        with self.guard:
+            self.reap()
+            candidate = self.active.get(session_id)
+            if candidate and candidate.state == "complete" and candidate.expires > time.monotonic():
+                job = candidate
+                job.downloads += 1
+                for fid in file_ids:
+                    path = job.sources.get(fid)
+                    if path and path.is_file():
+                        paths[fid] = path
+        try:
+            yield paths
+        finally:
+            if job is not None:
+                with self.guard:
+                    job.downloads -= 1

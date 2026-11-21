@@ -15,33 +15,148 @@
     <dt>SHA-256</dt><dd><code>{{ file.sha256 or 'Sin confirmar' }}</code></dd>
     {% endfor %}
   </dl>
-  {% set statuses = {'matching':'Coincidente','different':'Diferente','only_a':'Solo en A','only_b':'Solo en B','not_comparable':'No comparable'} %}
-  <h2>Resumen</h2>
-  <ul>
-    {% for key, count in result.summary.items() %}<li>{{ statuses[key] }} ({{ count }})</li>{% endfor %}
-    {% for note in result.notes %}<li>{{ note }}</li>{% endfor %}
-  </ul>
-  <table>
-    <thead><tr><th scope="col">Propiedad</th><th scope="col">Archivo A</th><th scope="col">Archivo B</th></tr></thead>
-    <tbody>
-    {% for row in result.rows %}
-    <tr>
-      <th scope="row">{{ row.label }}<br>{{ statuses[row.status] }}{% if row.explanation %}<br>{{ row.explanation }}{% endif %}</th>
-      {% for side in [row.a, row.b] %}
-      <td>
-        {% for item in side %}
-        {% if item.source %}<code>{{ item.source|join(' / ') }}</code>{% endif %}
-        <pre>{{ item.original|tojson }}</pre>
-        {% if 'interpreted' in item %}<p>Valor interpretado</p><pre>{{ item.interpreted|tojson }}</pre>{% endif %}
-        {% if item.interpretation_source %}<p>Fuente de hemisferio <code>{{ item.interpretation_source|join(' / ') }}</code></p>{% endif %}
-        {% for date in item.dates or [] %}{% if date.utc %}<p>UTC {{ date.utc }}</p>{% endif %}{% endfor %}
-        {% else %}Ausente{% endfor %}
-      </td>
+
+  {% if result.binary_identity %}
+  <section>
+    <h2>1. Identidad binaria</h2>
+    <p><strong>{{ result.binary_identity.verdict }}</strong></p>
+    {% if result.binary_identity.size_delta is not none %}
+    <p>Diferencia de tamaño: {{ result.binary_identity.size_delta }} bytes (A: {{ result.binary_identity.size_a }} B, B: {{ result.binary_identity.size_b }} B).</p>
+    {% endif %}
+    <ul>
+      {% for note in result.binary_identity.notes %}<li>{{ note }}</li>{% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if result.similarity %}
+  <section>
+    <h2>2. Similitud documental</h2>
+    {% if result.similarity.overall_available %}
+    <p><strong>{{ result.similarity.label }}</strong> (algoritmo v{{ result.similarity.algorithm_version }})</p>
+    {% else %}
+    <p><strong>{{ result.similarity.label }}</strong></p>
+    {% endif %}
+    <ul>
+      {% for dim_id in ['text', 'media', 'structure', 'metadata'] %}
+      {% set dim = result.similarity.dimensions[dim_id] %}
+      <li>
+        <strong>{{ dim.label }}:</strong>
+        {% if dim.available %}{{ dim.percentage }}%{% else %}No calculable{% endif %}
+        — {{ dim.reason }}
+      </li>
       {% endfor %}
-    </tr>
+    </ul>
+    {% if result.similarity.significant_changes %}
+    <h3>Cambios relevantes detectados</h3>
+    <ul>{% for change in result.similarity.significant_changes %}<li>{{ change }}</li>{% endfor %}</ul>
+    {% endif %}
+    {% if result.similarity.not_analyzed %}
+    <p>Dimensiones no analizadas: {{ result.similarity.not_analyzed|join(', ') }}.</p>
+    {% endif %}
+    {% if result.similarity.warnings %}
+    <h3>Advertencias</h3>
+    <ul>{% for warning in result.similarity.warnings %}<li>{{ warning }}</li>{% endfor %}</ul>
+    {% endif %}
+    <h3>Metodología y limitaciones</h3>
+    <p>{{ result.similarity.methodology.summary }}</p>
+    <ul>{% for caveat in result.similarity.methodology.caveats %}<li>{{ caveat }}</li>{% endfor %}</ul>
+  </section>
+  {% endif %}
+
+  {% if result.content_comparison %}
+  <section>
+    <h2>3. Diferencias profundas de contenido</h2>
+    {% if result.content_comparison.status == 'analyzed' %}
+    {% set cs = result.content_comparison.summary %}
+    <p>
+      Diapositivas A: {{ cs.slide_count_a }} | Diapositivas B: {{ cs.slide_count_b }} |
+      Idénticas: {{ cs.identical_slides }} | Modificadas: {{ cs.modified_slides }} |
+      Reordenadas: {{ cs.reordered_slides }} | Agregadas: {{ cs.added_slides }} |
+      Eliminadas: {{ cs.removed_slides }}.
+    </p>
+    {% set slide_labels = {'identical':'Idéntica','modified':'Contenido modificado','reordered':'Reordenada','added':'Agregada','removed':'Eliminada'} %}
+    {% for slide in result.content_comparison.slides %}
+    {% if slide.status != 'identical' %}
+    <article>
+      <h3>
+        {% if slide.slide_a and slide.slide_b and slide.slide_a != slide.slide_b %}
+        Diapositiva {{ slide.slide_a }} → {{ slide.slide_b }}
+        {% elif slide.slide_a %}
+        Diapositiva {{ slide.slide_a }}
+        {% else %}
+        Diapositiva {{ slide.slide_b }} (B)
+        {% endif %}
+        — {{ slide_labels[slide.status] }}
+        {% if slide.title %}({{ slide.title }}){% endif %}
+      </h3>
+      {% if slide.change_summary %}
+      <p>{{ slide.change_summary|join(' · ') }}</p>
+      {% endif %}
+      {% if slide.text_diff and (slide.text_diff.text_a or slide.text_diff.text_b) %}
+      <p><strong>Archivo A:</strong> {{ slide.text_diff.text_a or '—' }}</p>
+      <p><strong>Archivo B:</strong> {{ slide.text_diff.text_b or '—' }}</p>
+      <p><strong>Cambios:</strong>
+        {% for seg in slide.text_diff.segments %}{% if seg.op == 'delete' %}<del>{{ seg.text }}</del>{% elif seg.op == 'insert' %}<ins>{{ seg.text }}</ins>{% else %}{{ seg.text }}{% endif %}{% endfor %}
+      </p>
+      {% endif %}
+      {% if slide.structural_changes %}
+      <ul>
+        {% for ch in slide.structural_changes %}<li>{{ ch.label }}: {{ ch.before }} → {{ ch.after }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+    </article>
+    {% endif %}
     {% endfor %}
-    </tbody>
-  </table>
+
+    {% set media = result.content_comparison.media %}
+    <h3>Recursos multimedia</h3>
+    <p>
+      Idénticos: {{ media.identical|length }} | Sustituidos en diapositivas: {{ media.replaced|length }} |
+      Agregados: {{ media.added|length }} | Eliminados: {{ media.removed|length }}.
+    </p>
+    {% if media.replaced %}
+    <ul>
+      {% for item in media.replaced %}
+      <li>Diapositiva {{ item.slide_a }} → {{ item.slide_b }}: recurso sustituido ({{ item.removed_hashes|length }} retirado(s), {{ item.added_hashes|length }} nuevo(s)).</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% else %}
+    <p>{{ result.content_comparison.reason }}</p>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% set statuses = {'matching':'Coincidente','different':'Diferente','only_a':'Solo en A','only_b':'Solo en B','not_comparable':'No comparable'} %}
+  <section>
+    <h2>4. Comparación de metadatos</h2>
+    <ul>
+      {% for key, count in result.summary.items() %}<li>{{ statuses[key] }} ({{ count }})</li>{% endfor %}
+      {% for note in result.notes %}<li>{{ note }}</li>{% endfor %}
+    </ul>
+    <table>
+      <thead><tr><th scope="col">Propiedad</th><th scope="col">Archivo A</th><th scope="col">Archivo B</th></tr></thead>
+      <tbody>
+      {% for row in result.rows %}
+      <tr>
+        <th scope="row">{{ row.label }}<br>{{ statuses[row.status] }}{% if row.explanation %}<br>{{ row.explanation }}{% endif %}</th>
+        {% for side in [row.a, row.b] %}
+        <td>
+          {% for item in side %}
+          {% if item.source %}<code>{{ item.source|join(' / ') }}</code>{% endif %}
+          <pre>{{ item.original|tojson }}</pre>
+          {% if 'interpreted' in item %}<p>Valor interpretado</p><pre>{{ item.interpreted|tojson }}</pre>{% endif %}
+          {% if item.interpretation_source %}<p>Fuente de hemisferio <code>{{ item.interpretation_source|join(' / ') }}</code></p>{% endif %}
+          {% for date in item.dates or [] %}{% if date.utc %}<p>UTC {{ date.utc }}</p>{% endif %}{% endfor %}
+          {% else %}Ausente{% endfor %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
 </main>
 </body>
 </html>

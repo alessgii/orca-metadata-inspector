@@ -855,9 +855,28 @@ def detect_verified_format(path: Path, declared_format: str | None, settings: Se
     return declared_format
 
 
+def extract_content(path: Path, record: dict, settings: Settings | None = None) -> tuple[dict | None, str | None]:
+    """Extract persistable semantic/structural content snapshot without storing original bytes."""
+    settings = settings or Settings()
+    fmt = record.get("format")
+    if not fmt or record.get("status") in {"unsupported", "error"}:
+        return None, None
+    analyzer = CONTENT_ANALYZERS.get(fmt)
+    if analyzer is None:
+        return None, None
+    verified = detect_verified_format(path, fmt, settings)
+    if verified != fmt:
+        return None, "La firma binaria o estructura interna no coincide con el formato esperado."
+    try:
+        return analyzer.extract(path, settings), None
+    except ContentError as exc:
+        return None, str(exc)
+
+
 def compare_content(record_a: dict, record_b: dict, path_a: Path | None = None,
-                    path_b: Path | None = None, settings: Settings | None = None) -> dict:
-    """Run extensible format-aware deep content comparison when files and analyzer are available."""
+                    path_b: Path | None = None, settings: Settings | None = None,
+                    extracted_a: dict | None = None, extracted_b: dict | None = None) -> dict:
+    """Run extensible format-aware deep content comparison using extracted snapshots or live files."""
     settings = settings or Settings()
     fmt_a = record_a.get("format")
     fmt_b = record_b.get("format")
@@ -908,11 +927,32 @@ def compare_content(record_a: dict, record_b: dict, path_a: Path | None = None,
             ],
         }
 
+    # Prefer persisted semantic/structural snapshots when available (e.g., Investigations without original bytes)
+    if (isinstance(extracted_a, dict) and isinstance(extracted_b, dict)
+            and extracted_a.get("format") == fmt_a and extracted_b.get("format") == fmt_b):
+        try:
+            result = analyzer.compare(extracted_a, extracted_b)
+            result["supported_formats"] = sorted(CONTENT_ANALYZERS)
+            return result
+        except (ContentError, KeyError, TypeError, ValueError) as exc:
+            return {
+                "status": "error",
+                "format": fmt_a,
+                "reason": f"No se pudo comparar la estructura persistida: {exc}",
+                "supported_formats": sorted(CONTENT_ANALYZERS),
+                "metrics": {
+                    "text": {"available": False, "score": None},
+                    "media": {"available": False, "score": None},
+                    "structure": {"available": False, "score": None},
+                },
+                "limitations": ["Vuelve a cargar los archivos originales para repetir la extracción estructural."],
+            }
+
     if not path_a or not path_b or not path_a.is_file() or not path_b.is_file():
         return {
             "status": "unavailable",
             "format": fmt_a,
-            "reason": "Los archivos temporales de esta sesión ya no están disponibles (sesión del historial). Vuelve a cargar los archivos para analizar su contenido profundo.",
+            "reason": "Los archivos temporales de esta sesión ya no están disponibles y no hay estructura extraída guardada. Vuelve a cargar los archivos para analizar su contenido profundo.",
             "supported_formats": sorted(CONTENT_ANALYZERS),
             "metrics": {
                 "text": {"available": False, "score": None},
@@ -940,9 +980,9 @@ def compare_content(record_a: dict, record_b: dict, path_a: Path | None = None,
         }
 
     try:
-        extracted_a = analyzer.extract(path_a, settings)
-        extracted_b = analyzer.extract(path_b, settings)
-        result = analyzer.compare(extracted_a, extracted_b)
+        snap_a = analyzer.extract(path_a, settings)
+        snap_b = analyzer.extract(path_b, settings)
+        result = analyzer.compare(snap_a, snap_b)
         result["supported_formats"] = sorted(CONTENT_ANALYZERS)
         return result
     except ContentError as exc:

@@ -147,7 +147,8 @@ def binary_identity_summary(first, second):
     }
 
 
-def compare_files(first, second, path_a=None, path_b=None, settings=None):
+def compare_files(first, second, path_a=None, path_b=None, settings=None,
+                  extracted_a=None, extracted_b=None):
     a, b = entries(first), entries(second)
     rows = []
     keys = [*GENERAL, *sorted((a.keys() | b.keys()) - GENERAL.keys())]
@@ -204,7 +205,10 @@ def compare_files(first, second, path_a=None, path_b=None, settings=None):
         notes.append(f"Solo el archivo {'A' if locations[0] else 'B'} registra datos de ubicación examinados.")
 
     binary_identity = binary_identity_summary(first, second)
-    content = compare_content(first, second, path_a=path_a, path_b=path_b, settings=settings)
+    content = compare_content(
+        first, second, path_a=path_a, path_b=path_b, settings=settings,
+        extracted_a=extracted_a, extracted_b=extracted_b,
+    )
     similarity = compute_similarity(binary_identity, content, rows)
     metadata_comparison = {
         "summary": {status: counts[status] for status in STATUSES},

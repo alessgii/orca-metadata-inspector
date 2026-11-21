@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'">
+  <title>Informe de investigación · {{ report.investigation.name }} | Orca</title>
+</head>
+<body>
+<main>
+  {% set inv = report.investigation %}
+  <h1>Informe de investigación: {{ inv.name }}</h1>
+  <dl>
+    <dt>Responsable declarado</dt><dd>{{ inv.responsible }}</dd>
+    <dt>UUID</dt><dd><code>{{ inv.uuid }}</code></dd>
+    <dt>Estado</dt><dd>{{ inv.status_label }}</dd>
+    <dt>Tipo</dt><dd>{{ inv.kind_label }}</dd>
+    <dt>Clasificación</dt><dd>{{ inv.classification_label }}</dd>
+    <dt>Fecha de apertura (UTC)</dt><dd>{{ inv.created_at }}</dd>
+    <dt>Última actividad (UTC)</dt><dd>{{ inv.updated_at }}</dd>
+    {% if inv.closed_at %}<dt>Fecha de cierre (UTC)</dt><dd>{{ inv.closed_at }}</dd>{% endif %}
+    {% if inv.origin_uuid %}<dt>Copia derivada de UUID</dt><dd><code>{{ inv.origin_uuid }}</code> — {{ inv.origin_note }}</dd>{% endif %}
+    {% if inv.description %}<dt>Descripción</dt><dd>{{ inv.description }}</dd>{% endif %}
+  </dl>
+  <p><em>{{ inv.disclaimers.clock }} {{ inv.disclaimers.classification }} {{ inv.disclaimers.actor }}</em></p>
+
+  {% if inv.latest_closure %}
+  <section>
+    <h2>Conclusiones y cierre</h2>
+    <p><strong>Resumen de hallazgos:</strong> {{ inv.latest_closure.summary }}</p>
+    <p><strong>Conclusión:</strong> {{ inv.latest_closure.conclusion }}</p>
+    {% if inv.latest_closure.final_notes %}<p><strong>Observaciones finales:</strong> {{ inv.latest_closure.final_notes }}</p>{% endif %}
+    <p><em>Cerrado por {{ inv.latest_closure.actor }} el {{ inv.latest_closure.created_at }} (UTC). {{ inv.disclaimers.conclusion }}</em></p>
+  </section>
+  {% endif %}
+
+  <section>
+    <h2>1. Inventario de archivos ({{ report.deterministic_facts.files|length }})</h2>
+    <p><em>Los archivos originales no se almacenan permanentemente en la base de datos; se conservan huellas, metadatos y resultados de análisis.</em></p>
+    {% if report.deterministic_facts.files %}
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Archivo</th>
+          <th scope="col">Formato</th>
+          <th scope="col">Tamaño (B)</th>
+          <th scope="col">SHA-256</th>
+          <th scope="col">Estado</th>
+          <th scope="col">Incorporado (UTC)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in report.deterministic_facts.files %}
+        <tr>
+          <td>{{ f.name }}{% if f.relative_path and f.relative_path != f.name %}<br><code>{{ f.relative_path }}</code>{% endif %}</td>
+          <td>{{ f.format or 'Sin confirmar' }}</td>
+          <td>{{ f.size }}</td>
+          <td><code>{{ f.sha256 or '—' }}</code></td>
+          <td>{{ f.status }}{% if f.duplicate_of_uuid %} (duplicado binario){% endif %}</td>
+          <td>{{ f.added_at }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p>No hay archivos registrados en esta investigación.</p>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>2. Comparaciones registradas ({{ report.deterministic_facts.comparisons|length }})</h2>
+    {% if report.deterministic_facts.comparisons %}
+    <ul>
+      {% for c in report.deterministic_facts.comparisons %}
+      <li>
+        <strong>{{ c.result.a.name }}</strong> frente a <strong>{{ c.result.b.name }}</strong>
+        — {% if c.identical_bytes %}Bytes idénticos (SHA-256){% else %}Bytes distintos{% endif %}
+        {% if c.similarity_available %} · Similitud documental: {{ c.similarity_overall }}%{% else %} · Sin porcentaje global de contenido{% endif %}
+        ({{ c.created_at }} UTC, analizador {{ c.analyzer_version }})
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p>No se han ejecutado comparaciones todavía.</p>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>3. Observaciones del investigador ({{ report.human_observations.notes|length }})</h2>
+    <p><em>Las notas siguientes son observaciones humanas y se distinguen de los resultados automáticos del inspector.</em></p>
+    {% if report.human_observations.notes %}
+    {% for n in report.human_observations.notes %}
+    <article>
+      <p><strong>{{ n.author }}</strong> · {{ n.updated_at }} (UTC) · Vínculo: {{ n.target_type }} · Versión {{ n.version }}</p>
+      <p>{{ n.text }}</p>
+    </article>
+    {% endfor %}
+    {% else %}
+    <p>Sin observaciones registradas.</p>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>4. Línea de tiempo de actividades ({{ report.deterministic_facts.activity_timeline|length }})</h2>
+    <ol>
+      {% for ev in report.deterministic_facts.activity_timeline %}
+      <li>
+        <code>{{ ev.created_at }}</code> · <strong>{{ ev.event_type }}</strong> · {{ ev.actor }} — {{ ev.description }}
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+</main>
+</body>
+</html>

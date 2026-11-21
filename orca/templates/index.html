@@ -6,73 +6,93 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark">
+  <meta name="color-scheme" content="light dark">
   <title>Orca Metadata Inspector</title>
   <link rel="icon" href="/static/mark.svg" type="image/svg+xml">
+  <script src="/static/theme.js"></script>
   <link rel="stylesheet" href="/static/app.css">
+  <script defer src="/static/timeline-summary.js"></script>
+  <script defer src="/static/inspection.js"></script>
   <script defer src="/static/app.js"></script>
 </head>
 <body>
 <a href="#main" class="sr-only focus:not-sr-only skip">Saltar al contenido</a>
-<div class="shell">
-  <aside class="rail" aria-label="Navegación">
-    <a href="#workspace" class="brand flex items-center gap-3">
-      <img src="/static/mark.svg" width="35" height="35" alt="">
-      <span><strong>Orca</strong><small>Metadata Inspector</small></span>
-    </a>
-    <nav class="nav grid gap-1" aria-label="Principal">
-      <a href="#workspace" data-page="workspace" aria-current="page">{{icon('scan')}}<span>Inspector</span></a>
-      <a href="#history" data-page="history">{{icon('history')}}<span>Historial</span></a>
-      <a href="#guide" data-page="guide">{{icon('help')}}<span>Guía de uso</span></a>
-    </nav>
-    <div class="rail-foot">
-      <div class="health"><span id="engine-dot"></span><span id="engine">Comprobando ExifTool</span></div>
-      <div class="mono rail-host">127.0.0.1 <span> / </span> v1.0</div>
+<div class="app-shell">
+  <aside id="sidebar" class="sidebar" aria-label="Barra de herramientas">
+    <div class="sidebar-header">
+      <a href="#workspace" class="brand" aria-label="La Orca, Inspector" title="La Orca">
+        <img src="/static/mark.svg" width="33" height="33" alt="">
+        <span class="sidebar-label"><strong>La Orca</strong><small>Inspector de metadatos</small></span>
+      </a>
+      <button id="sidebar-toggle" class="button icon-button" type="button" aria-expanded="true"
+        aria-controls="sidebar-tools" aria-label="Plegar barra lateral" title="Plegar barra lateral">{{icon('sidebar')}}</button>
+    </div>
+    <div id="sidebar-tools" class="sidebar-tools">
+      <nav class="app-nav sidebar-nav" aria-label="Principal">
+        <a class="sidebar-tool" href="#workspace" data-page="workspace" aria-current="page"
+          aria-label="Inspector" title="Inspector">{{icon('scan')}}<span class="sidebar-label">Inspector</span></a>
+        <a class="sidebar-tool" href="#history" data-page="history" aria-label="Historial" title="Historial">
+          {{icon('history')}}<span class="sidebar-label">Historial</span></a>
+        <a class="sidebar-tool" href="#guide" data-page="guide" aria-label="Guía de uso" title="Guía de uso">
+          {{icon('help')}}<span class="sidebar-label">Guía de uso</span></a>
+      </nav>
+      <nav id="file-tools" class="sidebar-nav file-tools" aria-label="Vistas del archivo" hidden></nav>
     </div>
   </aside>
-  <div class="surface min-w-0">
-    <header class="topbar flex items-center justify-between gap-3">
-      <div class="crumb flex items-center gap-2">{{icon('layers')}}<span>Área de trabajo</span>{{icon('chevron')}}<strong id="crumb-current">Inspector</strong></div>
-      <span class="local flex items-center gap-2">{{icon('lock')}} Procesamiento local</span>
+  <div class="app-content">
+    <header class="app-header">
+      <div class="app-bar">
+        <span class="health" role="status"><span id="engine-dot"></span><span id="engine">Comprobando ExifTool</span></span>
+        <button id="theme-toggle" class="button icon-button theme-toggle" type="button" aria-label="Tema oscuro" aria-pressed="false" title="Cambiar tema">
+          {{icon('moon', 'icon theme-moon')}}{{icon('sun', 'icon theme-sun')}}
+        </button>
+      </div>
     </header>
-    <main id="main" class="workspace" tabindex="-1">
-      <section id="page-workspace">
-        <header class="page-head">
-          <h1>Inspección de<br class="small-break"> metadatos</h1>
-          <p>Examina lo que tus archivos revelan sobre su origen y creación.</p>
-        </header>
-        <div class="intake">
-          <section class="panel upload-panel" aria-labelledby="load-title">
-            <div class="panel-label flex items-center gap-2">{{icon('upload')}}<h2 id="load-title">Cargar archivos</h2></div>
-            <div id="drop" class="drop">
-              <div class="upload-glyph">{{icon('upload')}}</div>
-              <p class="drop-title">Arrastra y suelta los archivos aquí</p>
-              <p class="muted drop-note">Archivos individuales o un contenedor ZIP</p>
-              <button id="pick" class="button primary" type="button">Seleccionar archivos</button>
-              <input id="picker" type="file" multiple hidden aria-label="Seleccionar archivos">
-            </div>
-            <ul id="queue" class="queue" hidden aria-label="Archivos seleccionados"></ul>
-            <div class="upload-actions flex flex-wrap items-center justify-between gap-3">
-              <label class="check flex items-center gap-2"><input id="keep" type="checkbox"> Guardar en el historial</label>
-              <div class="flex items-center gap-2">
-                <button id="reset" class="button subtle" type="button" hidden>Vaciar</button>
-                <button id="analyze" class="button accent-button" type="button" disabled>{{icon('scan')}} Analizar</button>
+<main id="main" class="workspace" tabindex="-1">
+  <section id="page-workspace">
+    <header class="page-head workspace-head">
+      <div>
+        <h1 tabindex="-1">Inspección de metadatos</h1>
+        <p>Examina qué revelan tus archivos sobre su origen y creación.</p>
+      </div>
+      <button id="reopen-upload" class="button primary" type="button" aria-controls="intake" hidden>{{icon('plus')}} Nuevo análisis</button>
+    </header>
+    <div id="intake" class="intake">
+      <section class="panel upload-panel" aria-labelledby="load-title">
+        <div class="intake-head">
+          <div class="panel-label">{{icon('upload')}}<h2 id="load-title">Cargar archivos</h2></div>
+          <div class="intake-tools">
+            <details class="format-disclosure">
+              <summary>{{icon('help')}} Formatos y límites</summary>
+              <div class="format-content">
+                <dl>
+                  <div><dt>Documentos</dt><dd>PDF, DOCX, XLSX, PPTX</dd></div>
+                  <div><dt>Imágenes</dt><dd>JPEG, PNG, WebP</dd></div>
+                  <div><dt>Contenedores</dt><dd>ZIP de hasta 100 MB</dd></div>
+                </dl>
+                <p>Hasta 100 archivos por análisis, incluidos los miembros del ZIP. Las cargas directas admiten hasta 100 MB en total.</p>
               </div>
-            </div>
-          </section>
-          <aside class="panel format-panel" aria-labelledby="format-title">
-            <div class="panel-label flex items-center gap-2">{{icon('layers')}}<h2 id="format-title">Formatos admitidos</h2></div>
-            <ul class="format-list">
-              <li>{{icon('file')}}<div><strong>Documentos</strong><span>PDF, DOCX, XLSX, PPTX</span></div></li>
-              <li>{{icon('image')}}<div><strong>Imágenes</strong><span>JPEG, PNG, WebP</span></div></li>
-              <li>{{icon('archive')}}<div><strong>Contenedores</strong><span>ZIP de hasta 100 MB</span></div></li>
-            </ul>
-            <div class="intake-limit">
-              <span class="format-limit">100 archivos máx.</span>
-              <p>Por análisis, incluidos los miembros del ZIP. Carga directa de hasta 100 MB en total.</p>
-            </div>
-          </aside>
+            </details>
+            <button id="collapse-upload" class="button icon-button" type="button" aria-label="Plegar carga" title="Plegar carga" hidden>{{icon('x')}}</button>
+          </div>
         </div>
+        <div id="drop" class="drop">
+          <div class="upload-glyph">{{icon('file-stack')}}</div>
+          <p class="drop-title">Arrastra archivos aquí</p>
+          <p class="drop-note">Admite documentos, imágenes y archivos ZIP.</p>
+          <button id="pick" class="button subtle" type="button">{{icon('plus')}} Seleccionar archivos</button>
+          <input id="picker" type="file" multiple hidden aria-label="Seleccionar archivos">
+        </div>
+        <ul id="queue" class="queue" hidden aria-label="Archivos seleccionados"></ul>
+        <div class="upload-actions">
+          <label class="check"><input id="keep" type="checkbox"> Guardar en el historial</label>
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="reset" class="button quiet" type="button" hidden>Vaciar</button>
+            <button id="analyze" class="button primary" type="button" disabled>{{icon('scan')}} Analizar</button>
+          </div>
+        </div>
+      </section>
+    </div>
         <div id="upload-message" class="notice" role="status" hidden></div>
         <div id="progress-box" class="panel progress-box" hidden>
           <div class="flex justify-between gap-3"><strong id="progress-title"></strong><span class="mono" id="progress-count"></span></div>
@@ -81,53 +101,68 @@
         </div>
         <section class="results" aria-labelledby="results-title">
           <div class="section-head flex flex-wrap items-center justify-between gap-3">
-            <div><h2 id="results-title">Resultados de la sesión</h2><p id="result-meta" class="muted">Resumen, archivos y coincidencias de un análisis.</p></div>
+            <div><h2 id="results-title">Resultados de la sesión</h2><p id="result-meta" class="muted" hidden></p></div>
             <div id="result-actions" class="flex flex-wrap gap-2" hidden>
               <details class="exports"><summary class="button subtle">{{icon('download')}} Exportar</summary><div id="downloads"></div></details>
               <button class="button subtle" id="close-session" type="button">Eliminar sesión</button>
             </div>
           </div>
-          <div id="empty-results" class="panel empty">
-            <span class="empty-icon">{{icon('table')}}</span>
-            <div><strong>Todavía no hay resultados</strong><p>Selecciona los archivos y ejecuta un análisis para inspeccionarlos aquí.</p></div>
+          <div class="session-summary" id="session-summary" hidden>
+            <div id="stats" class="stats" aria-label="Resumen de la sesión"></div>
+            <details class="overview"><summary>{{icon('layers')}} Distribución y autores</summary><div id="breakdown" class="breakdown"></div></details>
           </div>
-          <div id="results" hidden>
-            <div id="stats" class="stats"></div>
-            <details class="panel overview"><summary>Distribución, autores y software</summary><div id="breakdown" class="breakdown"></div></details>
+          <div id="results">
             <section class="panel table-panel" aria-labelledby="files-title">
-              <div class="table-controls flex flex-wrap items-center gap-2">
-                <h3 id="files-title" class="mr-auto">Archivos <span id="match-count" class="muted"></span></h3>
+              <div id="table-controls" class="table-controls flex flex-wrap items-center gap-2" hidden>
+                <h3 class="mr-auto">Archivos <span id="match-count" class="muted"></span></h3>
                 <label class="search flex items-center gap-2">{{icon('search')}}<span class="sr-only">Buscar archivos</span><input id="search" type="search" placeholder="Buscar archivos"></label>
                 <label class="sr-only" for="format-filter">Filtrar formato</label><select id="format-filter"></select>
                 <label class="sr-only" for="status-filter">Filtrar estado</label><select id="status-filter"></select>
               </div>
+              <div id="duel-toolbar" class="duel-toolbar" hidden>
+                <span id="duel-selection" class="small muted" role="status"></span>
+                <div class="flex flex-wrap gap-2">
+                  <button class="button subtle" id="duel-clear" type="button" hidden>Quitar selección</button>
+                  <button class="button accent-button" id="duel-open" type="button" disabled>Comparar archivos</button>
+                </div>
+              </div>
               <div class="scroll-table" role="region" tabindex="0" aria-label="Tabla de archivos">
-                <table>
+                <table id="file-table">
+                  <caption id="files-title" class="sr-only">Archivos de la sesión</caption>
                   <thead><tr>
-                    <th scope="col"><button data-sort="name">Nombre</button></th>
+                    <th scope="col" id="duel-column" hidden><span class="sr-only">Selección para el duelo</span></th>
+                    <th scope="col"><button data-sort="name">Archivo</button></th>
                     <th scope="col"><button data-sort="format">Formato</button></th>
                     <th scope="col"><button data-sort="size">Tamaño</button></th>
-                    <th scope="col"><button data-sort="author">Autor</button></th>
+                    <th scope="col"><button data-sort="author">Autor o creador</button></th>
                     <th scope="col"><button data-sort="software">Software</button></th>
                     <th scope="col"><button data-sort="date">Fecha</button></th>
-                    <th scope="col"><button data-sort="field_count">Campos</button></th>
+                    <th scope="col"><button data-sort="field_count">Propiedades</button></th>
                     <th scope="col"><button data-sort="status">Estado</button></th>
                     <th scope="col"><span class="sr-only">Detalles</span></th>
                   </tr></thead>
-                  <tbody id="files"></tbody>
+                  <tbody id="empty-results">
+                    <tr><td colspan="9" class="empty-cell">
+                      <div class="empty">
+                        <span class="empty-icon">{{icon('table')}}</span>
+                        <div><strong>Todavía no hay resultados</strong><p>Los archivos analizados aparecerán en esta tabla.</p></div>
+                      </div>
+                    </td></tr>
+                  </tbody>
+                  <tbody id="files" hidden></tbody>
                 </table>
               </div>
             </section>
-            <section class="panel correlations" aria-labelledby="corr-title">
-              <h3 id="corr-title">Coincidencias entre archivos</h3>
+            <details id="correlation-panel" class="panel correlations" hidden>
+              <summary>Coincidencias entre archivos</summary>
               <p class="small muted">Abre una coincidencia para consultar los archivos y sus campos de origen.</p>
               <div id="correlations"></div>
-            </section>
+            </details>
           </div>
         </section>
       </section>
       <section id="page-history" hidden>
-        <header class="page-head"><h1>Historial local</h1><p>Consulta los análisis que elegiste guardar en este equipo.</p></header>
+        <header class="page-head"><h1 tabindex="-1">Historial local</h1><p>Consulta los análisis que elegiste guardar en este equipo.</p></header>
         <section class="panel history">
           <div class="section-head flex flex-wrap items-center justify-between gap-3">
             <div><h2>Sesiones guardadas</h2><p class="muted small">Se guardan nombres, hashes, metadatos, hallazgos y errores de análisis.</p></div>
@@ -138,7 +173,7 @@
         </section>
       </section>
       <section id="page-guide" hidden>
-        <header class="page-head"><h1>Guía de uso</h1><p>Cómo interpretar los campos y verificar una copia saneada.</p></header>
+        <header class="page-head"><h1 tabindex="-1">Guía de uso</h1><p>Cómo interpretar los campos y verificar una copia saneada.</p></header>
         <section class="panel guide">
           <h2>Inspección</h2>
           <p>Selecciona archivos propios, abre un resultado y consulta el campo original de cada valor normalizado. Una coincidencia indica que el valor aparece en varios archivos. La autoría, el entorno y el significado requieren comprobación independiente.</p>
@@ -149,19 +184,32 @@
           <p>Los archivos originales y las copias de descarga son temporales. Se eliminan al cerrar la sesión o al terminar la retención de {{ minutes }} min. Las sesiones guardadas en SQLite se pueden eliminar desde Historial. Descarga la copia antes de cerrar la sesión.</p>
         </section>
       </section>
-      <footer class="workspace-foot flex flex-wrap items-center justify-between gap-3">
-        <span>Orca Metadata Inspector</span><a href="#guide">Límites y limpieza de metadatos</a>
+      <section id="page-detail" class="workbench" aria-labelledby="detail-title" hidden>
+        <a href="#workspace" class="return-link" data-return>{{icon('back')}} Volver a resultados</a>
+        <header class="workbench-head">
+          <span class="file-mark">{{icon('file')}}</span>
+          <div>
+            <p class="small muted">Inspector de archivo</p>
+            <h1 id="detail-title" tabindex="-1">Inspector de archivo</h1>
+          </div>
+        </header>
+        <div id="detail-summary"></div>
+        <div id="detail-body" class="inspection-body"></div>
+      </section>
+      <section id="page-duel" class="workbench" aria-labelledby="duel-title" hidden>
+        <a href="#workspace" class="return-link" data-return>{{icon('back')}} Volver a resultados</a>
+        <header class="workbench-head">
+          <span class="file-mark">{{icon('compare')}}</span>
+          <div><h1 id="duel-title" tabindex="-1">Duelo de documentos</h1><p class="muted">Compara los campos registrados de dos archivos de la misma sesión.</p></div>
+        </header>
+        <div id="duel-body" class="inspection-body duel-body"></div>
+      </section>
+      <footer class="workspace-foot">
+        <span>La Orca · Inspector local de metadatos</span><a href="#guide">Límites y limpieza de metadatos</a>
       </footer>
-    </main>
+</main>
   </div>
 </div>
-<dialog id="detail" aria-labelledby="detail-title">
-  <div class="dialog-head flex items-start justify-between gap-3">
-    <div><p id="detail-kind" class="mono muted small">Archivo</p><h2 id="detail-title">Inspector individual</h2></div>
-    <form method="dialog"><button type="submit" class="button icon-button" aria-label="Cerrar inspector">{{icon('x')}}</button></form>
-  </div>
-  <div id="detail-body" class="dialog-body"></div>
-</dialog>
 <dialog id="confirm" aria-labelledby="confirm-title">
   <div class="dialog-head"><h2 id="confirm-title">Eliminar datos locales</h2></div>
   <div class="dialog-body"><p id="confirm-text"></p>

@@ -57,14 +57,74 @@ Abre [Orca en 127.0.0.1:8000](http://127.0.0.1:8000/). También puedes dejar `ex
 
 ## Uso
 
+El botón de tema de la barra superior alterna entre claro y oscuro y conserva la preferencia en ese navegador.
+
 1. Selecciona o arrastra archivos y ZIP. Puedes quitar elementos de la cola o vaciarla antes de analizar. Marca **Guardar en el historial** si quieres recuperar los resultados después de cerrar el servidor.
 2. Pulsa **Analizar**. La barra cuenta los archivos terminados y muestra el nombre del archivo en curso cuando el servidor está extrayendo.
-3. Filtra, ordena o busca en la tabla. Abre **Detalles** para ver el SHA-256, los campos agrupados, el origen preciso de cada valor normalizado, los metadatos técnicos, los hallazgos y el JSON.
+3. Filtra, ordena o busca en la tabla. Abre el nombre del archivo o **Detalles** para ver el SHA-256, los campos agrupados, el origen de cada propiedad, los metadatos técnicos, los hallazgos y el JSON. **Volver a resultados** recupera la tabla. **Nuevo análisis** vuelve a abrir la carga.
 4. Abre las coincidencias entre archivos para ver el campo, el valor y los documentos asociados. Los nombres y el software se cotejan sin distinguir mayúsculas. Para rutas e identificadores se conserva la distinción de mayúsculas. Cada coincidencia describe valores registrados en los archivos. Verifica de forma independiente su autoría, procedencia e interpretación.
 5. En **Antes / Después**, crea una copia, revisa los campos eliminados, modificados, persistentes y añadidos, y descárgala. **Exportar** descarga el informe de la sesión original en JSON, CSV o HTML.
 6. Elimina una sesión desde el inspector o desde el historial. **Eliminar historial** vacía la base de resultados guardados. Las sesiones todavía activas siguen su plazo temporal.
 
 Las fechas internas se muestran como las devuelve ExifTool, con zona horaria solo cuando está presente. Las rutas y los nombres de carpeta de usuario reconocidos en textos se presentan con el campo que los contiene. Los hallazgos identifican propiedades potencialmente sensibles. El informe deja al lector la interpretación y las conclusiones. Los archivos en `tests/` se generan con valores sintéticos para comprobar el programa.
+
+## Herramientas del inspector
+
+### Máquina del tiempo
+
+Abre **Detalles → Cronología**. **Resumida** traza los instantes comparables en un eje proporcional y ofrece un selector para consultar eventos cercanos o simultáneos. Las fechas del sistema de archivos, cuando existen, usan su propio eje. **Avanzada** abre el detalle técnico vertical con los mismos datos. Puedes alternar con las flechas del teclado. Cada evento indica qué fecha se registró, su precisión, qué etiqueta la contiene y el valor original. Los instantes de segundo o fracción con un desplazamiento inequívoco se ordenan en UTC. Las horas locales, las fechas de calendario y los valores inválidos aparecen en secciones propias sin imponerles un orden absoluto. Orca conserva fuentes duplicadas y muestra discrepancias entre marcas del mismo tipo.
+
+El intervalo expresa tiempo transcurrido entre una creación y una modificación internas comparables. Cuando varias fuentes se refieren al mismo instante, se conservan todas. Si las fuentes comparables discrepan, Orca evita elegir un intervalo único. Las fechas de sistema de archivos se identifican si están presentes en los datos almacenados. El extractor actual excluye las fechas del sistema de archivos de la copia temporal para evitar atribuirlas al original. La detección usa etiquetas conocidas y, para las demás, exige un nombre temporal y un valor con formato compatible. `LinksUpToDate` se conserva como propiedad de estado en los metadatos originales y en la comparación.
+
+### Duelo de documentos
+
+Marca dos archivos de la misma sesión en la tabla y pulsa **Comparar archivos**. Puedes intercambiar A y B, filtrar por estado, incluir campos técnicos y descargar el resultado como JSON o HTML. En **Historial**, abre una sesión guardada para comparar sus archivos con el mismo flujo.
+
+La comparación agrupa etiquetas con un significado compatible y conserva los valores registrados junto con sus fuentes. Autor, creador, último editor, herramienta de creación y productor se presentan como roles distintos. Una lista semántica se coteja por sus valores, y las listas de etiquetas técnicas conservan el orden. Una cadena vacía, un nulo y un campo ausente tienen significados distintos. Las fechas con un instante UTC equivalente pueden coincidir aunque sus representaciones difieran. En coordenadas EXIF, Orca usa la referencia de hemisferio para comparar el signo y conserva ambas etiquetas. Una magnitud sin hemisferio queda como no comparable. Las coincidencias describen valores registrados y los hashes describen las huellas calculadas.
+
+### Copiar como evidencia
+
+En **Normalizados**, **Técnicos**, **Hallazgos** o **Exposición**, abre **Evidencia** junto al dato. Puedes copiar el valor original, un bloque Markdown o JSON con el archivo, SHA-256 si existe, fecha de análisis, versión de ExifTool, etiqueta exacta y ruta dentro del JSON de extracción. La evidencia contextual incluye el valor interpretado cuando difiere del original y la explicación del hallazgo cuando corresponde.
+
+Si el nombre y la etiqueta permiten una referencia segura, aparecen comandos para Linux o PowerShell. Ejecuta el comando desde el directorio que contiene el original con ExifTool en el PATH. El comando consulta campos y puede devolver varias instancias de una etiqueta. Los archivos contenidos en ZIP conservan su evidencia y su nombre de procedencia. Para esos miembros, la consulta por CLI requiere extraer el original y elegir su ruta.
+
+### ¿Qué estoy filtrando?
+
+Abre **Detalles → Exposición** para ver información examinada sobre identidad, ubicación, entorno de trabajo, historia documental, identificadores y texto descriptivo. Cada resultado indica la regla, su motivo y la procedencia. Cuando una regla detecta el mismo valor y el mismo tipo en varias fuentes, las agrupa y muestra todas.
+
+| Regla | Clasificación orientativa | Campos |
+| --- | --- | --- |
+| `identity.attribution`, `identity.account` | Potencial | Autores, creadores, editores, organizaciones y cuentas. |
+| `location.gps`, `location.place` | Potencial | Coordenadas o lugares declarados. |
+| `environment.path`, `environment.host` | Potencial | Rutas y nombres de equipo. |
+| `environment.tools`, `history.date` | Informativa | Software, versiones, equipos o fechas registradas. |
+| `identifier.document` | Informativa | Identificadores documentales y UUID. |
+| `identifier.serial` | Potencial | Números de serie reconocidos. |
+| `additional.description`, `additional.comments` | Informativa para títulos y palabras clave. Potencial para comentarios. | Texto descriptivo. |
+
+Selecciona **Abrir Antes / Después** para crear la copia si está disponible. Orca usa la extracción posterior para mostrar el recuento original, el de la copia y los valores eliminados, persistentes o añadidos. Los niveles son heurísticos. Pueden existir datos en el contenido visible o en estructuras fuera del alcance de ExifTool y del saneamiento.
+
+### Ejemplo reproducible
+
+Desde la raíz del proyecto y con las dependencias de pruebas instaladas, crea dos documentos propios de laboratorio:
+
+```bash
+.venv/bin/python - <<'PYTHON'
+from datetime import datetime, timezone
+from docx import Document
+
+for name, editor in [("prueba-a.docx", "Editor A"), ("prueba-b.docx", "Editor B")]:
+    document = Document()
+    document.add_paragraph("Contenido sintético de prueba.")
+    document.core_properties.author = "Cuenta de prueba"
+    document.core_properties.last_modified_by = editor
+    document.core_properties.created = datetime(2020, 2, 29, tzinfo=timezone.utc)
+    document.core_properties.modified = datetime(2024, 2, 29, tzinfo=timezone.utc)
+    document.save(name)
+PYTHON
+```
+
+Analiza los dos archivos juntos. En la cronología verás un intervalo de 1461 días. En el duelo coincide el creador y difiere el último editor. Desde Exposición puedes copiar el campo de edición como evidencia y verificar su eliminación sobre una copia.
 
 ## Alcance de la limpieza
 
@@ -110,6 +170,8 @@ Orca lee variables del entorno del proceso. Usa `export ORCA_TTL=900` en Linux o
 | `orca/uploads.py` | Cuotas, firmas binarias, validación de ZIP y Open XML, preparación de archivos. |
 | `orca/extraction.py` | Protocolo `Extractor`, adaptador ExifTool, subprocess acotado y SHA-256. |
 | `orca/analysis.py`, `orca/metadata.py` | Inspección, orígenes de campos normalizados, hallazgos, comparaciones y correlaciones. |
+| `orca/timeline.py`, `orca/duel.py` | Interpretación de fechas y comparación semántica de registros de una sesión. |
+| `orca/evidence.py`, `orca/exposure.py` | Evidencia contextual, reglas de exposición y diferencias tras limpiar. |
 | `orca/sessions.py`, `orca/storage.py` | Lotes, progreso, temporales y persistencia SQLite con dos tablas vinculadas para sesiones y documentos. |
 | `orca/cleanup.py`, `orca/rewrite.py` | Políticas por formato, reescritura, reextracción y validación de copias. |
 | `orca/reports.py`, `orca/templates/` | Informes y HTML escapado. El CSV protege contra celdas interpretadas como fórmulas. |
@@ -125,6 +187,9 @@ SQLite se usa mediante la biblioteca estándar para mantener la instalación lig
 | `POST /api/sessions` | Envía `files` repetido y `keep=1` opcional en multipart. Devuelve un identificador con 202. |
 | `GET /api/sessions/{id}` | Estado, progreso y resumen con filas de archivos al terminar. |
 | `GET /api/sessions/{id}/files/{file_id}` | JSON original, normalización con origen, hash y hallazgos. |
+| `GET /api/sessions/{id}/files/{file_id}/context` | Cronología, exposición y comparación de exposición si hay una copia vigente. |
+| `GET /api/sessions/{id}/files/{file_id}/evidence` | Evidencia. Usa `kind=raw&tag=...` o `kind=normalized`, `finding` o `exposure` con `index` desde cero en el orden del JSON. |
+| `GET /api/sessions/{id}/duel?file_a=…&file_b=…` | Comparación de dos archivos de una sesión. Usa `download=true` para descargar JSON o añade `format=html` para el informe. |
 | `POST /api/sessions/{id}/files/{file_id}/clean` | Reescribe y verifica una copia, devuelve la diferencia y el JSON posterior. |
 | `GET /api/sessions/{id}/files/{file_id}/copy` | Descarga la copia verificada vigente. |
 | `GET /api/sessions/{id}/export/{json\|csv\|html}` | Descarga el informe. |
@@ -139,6 +204,8 @@ Linux:
 .venv/bin/python -m pip install -r requirements-test.txt
 .venv/bin/python -m pytest -q
 ```
+
+Si tienes Node.js, puedes verificar la escala gráfica con `node --test tests/timeline-summary.test.cjs`.
 
 Windows:
 

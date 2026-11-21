@@ -2,9 +2,10 @@
 
 const $ = (id) => document.getElementById(id);
 const statusNames = {ok: "Analizado", empty: "Sin descriptivos", unsupported: "No compatible", error: "Error"};
-const pageNames = {workspace: "Inspector", history: "Historial", guide: "Guía de uso"};
+const pages = ["workspace", "history", "guide", "detail", "duel"];
+const storedId = /^[a-f0-9]{32}$/;
 const fields = {
-  author: "Autor o creador", organization: "Organización", username: "Usuario", created: "Creación",
+  author: "Autor declarado", organization: "Organización", username: "Usuario", created: "Creación",
   modified: "Modificación", software: "Software", version: "Versión", operating_system: "Sistema operativo",
   make: "Fabricante", model: "Modelo", latitude: "Latitud", longitude: "Longitud", gps: "Coordenadas",
   title: "Título", subject: "Asunto", comments: "Comentarios", keywords: "Palabras clave",
@@ -17,7 +18,7 @@ const numbers = new Intl.NumberFormat("es");
 const order = new Intl.Collator("es", {numeric: true, sensitivity: "base"});
 const state = {
   files: [], nextId: 0, working: false, engine: false, session: null, sort: "name", ascending: true,
-  inspection: null, historyVersion: 0,
+  inspection: null, historyVersion: 0, selected: [], route: 0, page: null, returnFocus: null,
 };
 
 function element(tag, className, ...children) {
@@ -105,16 +106,100 @@ async function checkEngine() {
   renderQueue();
 }
 
-function updatePage() {
-  const fromHash = location.hash.slice(1);
-  const current = Object.hasOwn(pageNames, fromHash) ? fromHash : "workspace";
-  for (const key of Object.keys(pageNames)) $("page-" + key).hidden = key !== current;
+const compactSidebar = window.matchMedia("(max-width: 700px)");
+
+function setSidebar(expanded) {
+  $("sidebar").dataset.collapsed = String(!expanded);
+  const toggle = $("sidebar-toggle");
+  const label = expanded ? "Plegar barra lateral" : "Expandir barra lateral";
+  toggle.setAttribute("aria-expanded", String(expanded));
+  toggle.setAttribute("aria-label", label);
+  toggle.title = label;
+}
+
+function focusHeading(page) {
+  const heading = $("page-" + page).querySelector("h1");
+  heading.focus({preventScroll: true});
+  window.scrollTo(0, 0);
+}
+
+function enterWorkbench(page, ids, {replace = false, ...presentation} = {}) {
+  const hash = "#" + [page, ...ids].join("/");
+  if (!replace) {
+    state.returnFocus = document.activeElement;
+    history.pushState({orcaWorkbench: true}, "", hash);
+  } else {
+    history.replaceState(history.state, "", hash);
+  }
+  updatePage(presentation);
+}
+
+async function updatePage(presentation = {}) {
+  const route = ++state.route;
+  const [name, ...ids] = location.hash.slice(1).split("/");
+  const workbench = (name === "detail" && ids.length === 2 || name === "duel" && ids.length === 3)
+    && ids.every((id) => storedId.test(id));
+  const current = workbench || ["history", "guide"].includes(name) ? name : "workspace";
+  const previous = state.page;
+  state.page = current;
+  state.inspection = null;
+  $("file-tools").hidden = true;
+  $("file-tools").replaceChildren();
+  for (const page of pages) $("page-" + page).hidden = page !== current;
   for (const item of document.querySelectorAll("[data-page]")) {
-    if (item.dataset.page === current) item.setAttribute("aria-current", "page");
+    if (item.dataset.page === (workbench ? "workspace" : current)) item.setAttribute("aria-current", "page");
     else item.removeAttribute("aria-current");
   }
-  $("crumb-current").textContent = pageNames[current];
-  if (current === "history") loadHistory();
+  if (!workbench) {
+    const trigger = state.returnFocus;
+    state.returnFocus = null;
+    if (current === "workspace" && trigger?.isConnected && !trigger.closest("[hidden]")) trigger.focus();
+    else if (previous && previous !== current) focusHeading(current);
+    if (current === "history") loadHistory();
+    return;
+  }
+
+  const [sessionId, ...files] = ids;
+  const body = $(current + "-body");
+  if (current === "detail") {
+    $("detail-title").textContent = "Inspector de archivo";
+    $("detail-summary").replaceChildren();
+  }
+  body.setAttribute("aria-busy", "true");
+  body.replaceChildren(element("p", "view-loading muted", "Leyendo los metadatos guardados…"));
+  if (!presentation.focusSwap) focusHeading(current);
+  try {
+    const session = state.session?.id === sessionId ? state.session : await api(sessionPath(sessionId));
+    if (state.route !== route) return;
+    if (session.state !== "complete") throw new Error("Esta sesión todavía no tiene resultados disponibles.");
+    if (state.session?.id !== sessionId) renderResults(session);
+    if (current === "detail") {
+      const record = await api(filePath(sessionId, files[0]));
+      if (state.route !== route) return;
+      const view = {session, record, cleaned: null, cleaning: false, error: ""};
+      state.inspection = view;
+      $("detail-title").textContent = record.name;
+      renderDetailSummary(view);
+      renderDetail(view);
+    } else {
+      await loadDuel(sessionId, ...files, route, presentation);
+    }
+  } catch (error) {
+    if (state.route === route) {
+      const notice = element("p", "notice", error.message);
+      notice.dataset.error = "true";
+      notice.setAttribute("role", "alert");
+      body.replaceChildren(notice);
+    }
+  } finally {
+    if (state.route === route) body.removeAttribute("aria-busy");
+  }
+}
+
+function setUploadOpen(open) {
+  $("intake").hidden = !open;
+  $("reopen-upload").hidden = open;
+  $("collapse-upload").hidden = !state.session;
 }
 
 function addFiles(files) {
@@ -134,6 +219,7 @@ function renderQueue() {
   $("pick").disabled = state.working;
   $("reset").disabled = state.working;
   $("keep").disabled = state.working;
+  $("collapse-upload").disabled = state.working;
   $("analyze").disabled = !state.files.length || state.working || !state.engine;
   const rows = state.files.map(({file, id}) => {
     const name = element("span", "min-w-0 break-all", file.name);
@@ -208,8 +294,8 @@ async function analyze() {
     state.files = [];
     renderResults(next);
     if (next.notice) message("upload-message", next.notice);
-    if (location.hash === "#history") loadHistory();
-    if (!location.hash || location.hash === "#workspace") {
+    if (state.page === "history") loadHistory();
+    if (state.page === "workspace") {
       $("results-title").tabIndex = -1;
       $("results-title").focus();
     }
@@ -223,13 +309,22 @@ async function analyze() {
 }
 
 function renderResults(session) {
+  const changed = state.session?.id !== session?.id;
+  if (changed) state.selected = [];
   state.session = session;
-  $("empty-results").hidden = Boolean(session);
-  $("results").hidden = $("result-actions").hidden = !session;
-  if (!session) {
-    $("result-meta").textContent = "Resumen, archivos y coincidencias de un análisis.";
-    return;
+  if (changed) setUploadOpen(!session || state.files.length > 0);
+  const loaded = Boolean(session);
+  $("empty-results").hidden = loaded;
+  for (const id of ["files", "table-controls", "result-actions", "result-meta", "session-summary", "correlation-panel"]) {
+    $(id).hidden = !loaded;
   }
+  const canCompare = loaded && session.files.length >= 2;
+  $("duel-toolbar").hidden = $("duel-column").hidden = !canCompare;
+  for (const sort of document.querySelectorAll("[data-sort]")) {
+    sort.disabled = !loaded;
+    if (!loaded) sort.parentElement.removeAttribute("aria-sort");
+  }
+  if (!session) return;
   const summary = session.summary;
   $("result-meta").textContent = [
     timestamp(session.created), (session.duration_ms / 1000).toLocaleString("es") + " s",
@@ -237,12 +332,12 @@ function renderResults(session) {
   ].join(" / ");
   $("downloads").replaceChildren(...["json", "csv", "html"].map((kind) =>
     link(kind.toUpperCase(), sessionPath(session.id) + "/export/" + kind)));
-  const cards = [
+  const metrics = [
     ["Archivos", summary.count], ["Propiedades", summary.properties], ["Hallazgos", summary.findings],
     ["Errores", summary.statuses.error],
   ];
-  $("stats").replaceChildren(...cards.map(([label, value]) => element("div", "panel stat",
-    element("strong", "mono", numbers.format(value)), element("span", "", label))));
+  $("stats").replaceChildren(...metrics.map(([label, value]) => element("div", "stat",
+    element("strong", "", numbers.format(value)), element("span", "", label))));
   const breakdown = [
     ["Formatos", Object.entries(summary.formats).map(([key, value]) => key + " (" + value + ")")],
     ["Autores (" + summary.authors.length + ")", summary.authors],
@@ -259,7 +354,7 @@ function renderResults(session) {
   $("correlations").replaceChildren(...(summary.correlations.length
     ? summary.correlations.map((match) => {
         const names = match.files.map((file) => {
-          const action = button(file.name, () => openDetail(session, file), "subtle");
+          const action = button(file.name, () => enterWorkbench("detail", [session.id, file.id]), "subtle");
           return element("li", "small", action, " ", element("code", "muted", file.source.join(" / ")));
         });
         return element("details", "correlation",
@@ -299,24 +394,35 @@ function renderTable() {
   const output = rows.map((row) => {
     const status = element("span", "status", statusNames[row.status]);
     status.dataset.status = row.status;
-    const action = button("Detalles", () => openDetail(session, row));
+    const target = "#" + ["detail", session.id, row.id].join("/");
+    const fileLink = link(row.name, target, "file-link");
+    fileLink.prepend(icon("file"));
+    fileLink.addEventListener("click", (event) => {
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      enterWorkbench("detail", [session.id, row.id]);
+    });
+    const action = button("Detalles", () => enterWorkbench("detail", [session.id, row.id]), "quiet");
     action.setAttribute("aria-label", "Detalles de " + row.name);
-    return element("tr", "",
-      element("td", "files-name", element("strong", "", row.name)),
-      element("td", "mono", display(row.format)),
-      element("td", "whitespace-nowrap", formatBytes(row.size)),
+    const selection = element("td", "duel-check", comparisonCheckbox(row));
+    selection.hidden = session.files.length < 2;
+    return element("tr", "", selection,
+      element("td", "files-name", fileLink),
+      element("td", "", element("span", "status", display(row.format))),
+      element("td", "whitespace-nowrap table-number", formatBytes(row.size)),
       element("td", "table-data", display(row.author)),
       element("td", "table-data", display(row.software)),
       element("td", "table-data", display(relevantDate(row))),
-      element("td", "mono", numbers.format(row.field_count)),
+      element("td", "table-number", numbers.format(row.field_count)),
       element("td", "", status), element("td", "", action));
   });
   if (!output.length) {
-    const empty = element("td", "muted", "Ningún archivo coincide con los filtros.");
-    empty.colSpan = 9;
+    const empty = element("td", "muted table-empty", "Ningún archivo coincide con los filtros.");
+    empty.colSpan = session.files.length < 2 ? 9 : 10;
     output.push(element("tr", "", empty));
   }
   $("files").replaceChildren(...output);
+  updateSelection();
 }
 
 function infoRows(items) {
@@ -324,28 +430,31 @@ function infoRows(items) {
     element("div", "", element("dt", "", label), element("dd", "", value))));
 }
 
-function structured(normalized) {
+function structured(view) {
+  const normalized = view.record.normalized;
   if (!Object.keys(normalized).length) return element("p", "muted", "Sin campos descriptivos detectados.");
+  const indices = new Map(Object.values(normalized).flat().map((item, index) => [item, index]));
   return element("div", "grid gap-2", ...Object.entries(groupNames)
     .filter(([group]) => normalized[group]?.length).map(([group, label]) => {
       const details = element("details", "", element("summary", "", label + " (" + normalized[group].length + ")"),
         infoRows(normalized[group].map((item) => [
-          fields[item.field] ?? item.field,
-          element("span", "", element("span", "", display(item.value)), element("br"),
-            element("code", "muted", item.source.join(" / "))),
+          metadataLabel(item),
+          element("div", "metadata-item", metadataValue(item.value, true),
+            element("code", "muted", item.source.join(" / ")), evidenceControl(view, "normalized", indices.get(item))),
         ])));
       details.open = group === "identity";
       return details;
     }));
 }
 
-function technical(raw) {
+function technical(view) {
   const groups = new Map();
-  for (const [key, value] of Object.entries(raw)) {
+  for (const [key, value] of Object.entries(view.record.raw)) {
     const pieces = key.split(":");
     const label = pieces.length > 1 ? pieces.slice(0, -1).join(" / ") : "Otros";
     if (!groups.has(label)) groups.set(label, []);
-    groups.get(label).push([pieces.at(-1), display(value)]);
+    groups.get(label).push([pieces.at(-1), element("div", "metadata-item",
+      metadataValue(value, true), evidenceControl(view, "raw", key))]);
   }
   return groups.size ? element("div", "grid gap-2", ...Array.from(groups, ([name, values]) =>
     element("details", "", element("summary", "", name + " (" + values.length + ")"), infoRows(values))))
@@ -378,12 +487,13 @@ function jsonView(record) {
     button("Descargar JSON", () => downloadJson(record))), status, element("pre", "", JSON.stringify(record, null, 2)));
 }
 
-function findingsView(items) {
+function findingsView(view) {
+  const items = view.record.findings;
   if (!items.length) return element("p", "muted", "Sin hallazgos potencialmente sensibles.");
-  return element("ul", "", ...items.map((item) => element("li", "finding",
-    element("strong", "", (fields[item.field] ?? item.field) + " · " + display(item.value)),
-    element("p", "muted small", item.description),
-    element("code", "small", item.source.join(" / ")))));
+  return element("ul", "", ...items.map((item, index) => element("li", "finding",
+    element("strong", "", metadataLabel(item)),
+    metadataValue(item.value, true), element("p", "muted small", item.description),
+    element("code", "small", item.source.join(" / ")), evidenceControl(view, "finding", index))));
 }
 
 function diffTable(rows) {
@@ -399,7 +509,7 @@ function diffTable(rows) {
 }
 
 function cleanupView(view) {
-  const box = element("section", "", element("h3", "", "Limpieza de metadatos"));
+  const box = element("section", "", element("h2", "", "Limpieza de metadatos"));
   if (!view.session.temporary || !cleanupKinds.has(view.record.format) || !["ok", "empty"].includes(view.record.status)) {
     box.append(element("p", "muted", view.session.temporary
       ? "Este archivo está disponible para inspección. Su formato o estado no admite limpieza verificada."
@@ -411,6 +521,11 @@ function cleanupView(view) {
     const action = button(view.cleaning ? "Verificando copia…" : "Crear copia saneada", () => cleanFile(view), "primary");
     action.disabled = view.cleaning;
     box.append(action);
+    if (view.cleaning) {
+      const progress = element("p", "small muted", "Verificando la copia y sus metadatos…");
+      progress.setAttribute("role", "status");
+      box.append(progress);
+    }
   }
   if (view.error) {
     const warning = element("p", "notice", view.error);
@@ -419,11 +534,12 @@ function cleanupView(view) {
     box.append(warning);
   }
   if (view.cleaned) {
-    const {after, comparison, policy, limits} = view.cleaned;
+    const {after, comparison, policy, limits, exposure_comparison: exposure} = view.cleaned;
     box.append(element("p", "", policy), element("p", "muted small", limits),
       link("Descargar copia saneada", filePath(view.session.id, view.record.id) + "/copy", "button primary"),
       element("p", "small", "SHA-256 de la copia"),
       element("code", "", after.sha256));
+    if (exposure) box.append(exposureComparisonView(exposure));
     for (const [key, name] of Object.entries({removed: "Eliminados", changed: "Modificados",
       retained: "Persistentes", added: "Añadidos"})) {
       const rows = comparison[key];
@@ -446,51 +562,77 @@ async function cleanFile(view) {
     view.error = error.message;
   } finally {
     view.cleaning = false;
-    if (state.inspection === view && view.tab === "clean") renderDetail(view, "clean");
+    if (state.inspection === view && ["clean", "exposure"].includes(view.tab)) {
+      const focusWasUnassigned = document.activeElement === document.body;
+      renderDetail(view, view.tab);
+      if (focusWasUnassigned && view.tab === "clean") {
+        $("detail-body").querySelector(".inspection-content .primary")?.focus();
+      }
+    }
   }
+}
+
+function hashControl(hash) {
+  if (!hash) return element("span", "muted", "—");
+  const feedback = element("p", "small muted copy-feedback");
+  feedback.setAttribute("role", "status");
+  const holder = element("div", "hash-value");
+  const copy = button(icon("copy"), () => copyText(hash, holder, feedback, "SHA-256 copiado."), "icon-button");
+  copy.setAttribute("aria-label", "Copiar SHA-256");
+  copy.title = "Copiar SHA-256";
+  holder.append(element("code", "", hash), copy, feedback);
+  return holder;
+}
+
+function renderDetailSummary(view) {
+  const record = view.record;
+  const status = element("span", "status", statusNames[record.status]);
+  status.dataset.status = record.status;
+  const size = formatBytes(record.size) + (record.size >= 1000 ? " (" + numbers.format(record.size) + " B)" : "");
+  const general = infoRows([
+    ["Formato", display(record.format)], ["Tamaño", size], ["Estado", status],
+    ["SHA-256", hashControl(record.sha256)],
+  ]);
+  general.className = "detail-facts panel";
+  const notices = [...record.errors, ...record.warnings].map((text) => element("li", "", text));
+  $("detail-summary").replaceChildren(general,
+    ...(notices.length ? [element("ul", "notice inspection-notices", ...notices)] : []));
 }
 
 function renderDetail(view, tab = "normalized") {
   view.tab = tab;
   const record = view.record;
   const choices = {
-    normalized: ["Normalizados", () => structured(record.normalized)],
-    technical: ["Técnicos", () => technical(record.raw)],
-    findings: ["Hallazgos (" + record.findings.length + ")", () => findingsView(record.findings)],
-    json: ["JSON", () => jsonView(record)], clean: ["Antes / Después", () => cleanupView(view)],
+    normalized: ["Normalizados", "Metadatos normalizados", "layers", () => structured(view)],
+    technical: ["Técnicos", "Metadatos técnicos", "braces", () => technical(view)],
+    timeline: ["Cronología", "", "clock", () => inspectionContextView(view, "timeline")],
+    findings: ["Hallazgos (" + record.findings.length + ")", "Hallazgos", "triangle", () => findingsView(view)],
+    exposure: ["Exposición", "", "shield", () => inspectionContextView(view, "exposure")],
+    json: ["JSON", "Registro JSON", "file", () => jsonView(record)],
+    clean: ["Antes / Después", "", "compare", () => cleanupView(view)],
   };
-  const navigation = element("nav", "detail-nav");
-  navigation.setAttribute("aria-label", "Vistas del archivo");
-  for (const [key, [text]] of Object.entries(choices)) {
-    const item = button(text, () => {
-      renderDetail(view, key);
-      $("detail-body").querySelector("[aria-pressed=true]").focus();
-    });
-    item.setAttribute("aria-pressed", String(key === tab));
-    navigation.append(item);
+  if (!view.navigation) {
+    view.navigation = $("file-tools");
+    view.navigation.hidden = false;
+    view.outlet = element("div", "inspection-content panel");
+    for (const [key, [text, , glyph]] of Object.entries(choices)) {
+      const item = button(element("span", "sidebar-label", text), () => {
+        renderDetail(view, key);
+        if (compactSidebar.matches) setSidebar(false);
+      }, "sidebar-tool");
+      item.prepend(icon(glyph));
+      item.setAttribute("aria-label", text);
+      item.title = text;
+      item.dataset.view = key;
+      view.navigation.append(item);
+    }
+    $("detail-body").replaceChildren(view.outlet);
   }
-  const general = infoRows([
-    ["Formato", display(record.format)], ["Tamaño", formatBytes(record.size) + " (" + numbers.format(record.size) + " B)"],
-    ["SHA-256", element("code", "", display(record.sha256))], ["Estado", statusNames[record.status]],
-  ]);
-  const notices = [...record.errors, ...record.warnings].map((text) => element("li", "", text));
-  $("detail-body").replaceChildren(general,
-    ...(notices.length ? [element("ul", "notice", ...notices)] : []), navigation, choices[tab][1]());
-}
-
-async function openDetail(session, row) {
-  const view = {session, record: null, cleaned: null, cleaning: false, error: ""};
-  state.inspection = view;
-  $("detail-title").textContent = row.name;
-  $("detail-kind").textContent = "Inspector individual";
-  $("detail-body").replaceChildren(element("p", "muted", "Cargando metadatos…"));
-  if (!$("detail").open) $("detail").showModal();
-  try {
-    view.record = await api(filePath(session.id, row.id));
-    if (state.inspection === view) renderDetail(view);
-  } catch (error) {
-    if (state.inspection === view) $("detail-body").replaceChildren(element("p", "notice", error.message));
+  for (const item of view.navigation.children) {
+    item.setAttribute("aria-pressed", String(item.dataset.view === tab));
   }
+  const [, heading, , content] = choices[tab];
+  view.outlet.replaceChildren(...(heading ? [element("h2", "", heading)] : []), content());
 }
 
 function confirmDelete(text) {
@@ -567,7 +709,29 @@ $("reset").addEventListener("click", () => {
 });
 $("analyze").addEventListener("click", analyze);
 $("close-session").addEventListener("click", () => removeSession(state.session.id));
-$("detail").addEventListener("close", () => { state.inspection = null; });
+$("reopen-upload").addEventListener("click", () => {
+  setUploadOpen(true);
+  $("pick").focus();
+});
+$("collapse-upload").addEventListener("click", () => {
+  setUploadOpen(false);
+  $("reopen-upload").focus();
+});
+for (const returnLink of document.querySelectorAll("[data-return]")) {
+  returnLink.addEventListener("click", (event) => {
+    if (!history.state?.orcaWorkbench || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    history.back();
+  });
+}
+$("duel-open").addEventListener("click", () => {
+  if (state.selected.length === 2) enterWorkbench("duel", [state.session.id, ...state.selected]);
+});
+$("duel-clear").addEventListener("click", () => {
+  state.selected = [];
+  updateSelection();
+  $("files").querySelector("[data-compare-id]")?.focus();
+});
 $("search").addEventListener("input", renderTable);
 for (const id of ["format-filter", "status-filter"]) $(id).addEventListener("change", renderTable);
 for (const sort of document.querySelectorAll("[data-sort]")) sort.addEventListener("click", () => {
@@ -589,6 +753,24 @@ for (const eventName of ["dragenter", "dragover", "dragleave", "drop"]) {
 for (const eventName of ["dragover", "drop"]) window.addEventListener(eventName, (event) => {
   if (event.dataTransfer.types.includes("Files")) event.preventDefault();
 });
-window.addEventListener("hashchange", updatePage);
+$("sidebar-toggle").addEventListener("click", () => {
+  setSidebar($("sidebar").dataset.collapsed === "true");
+});
+compactSidebar.addEventListener("change", (event) => setSidebar(!event.matches));
+$("sidebar").addEventListener("click", (event) => {
+  if (compactSidebar.matches && event.target.closest("a")) setSidebar(false);
+});
+$("sidebar").addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || $("sidebar").dataset.collapsed === "true") return;
+  setSidebar(false);
+  $("sidebar-toggle").focus();
+});
+setSidebar(!compactSidebar.matches);
+document.querySelector(".skip").addEventListener("click", (event) => {
+  event.preventDefault();
+  $("main").focus();
+});
+window.addEventListener("hashchange", () => updatePage());
+renderResults(null);
 updatePage();
 checkEngine();

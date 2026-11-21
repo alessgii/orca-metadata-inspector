@@ -38,6 +38,7 @@ from .hashes import (
     normalize_algorithms,
     validate_hex_digest,
 )
+from .investigations import InvestigationError, InvestigationService
 from .manifests import (
     ManifestError,
     build_manifest,
@@ -45,10 +46,11 @@ from .manifests import (
     verify_manifest,
 )
 from .metadata import properties
+from .portability import export_investigation_zip, import_package, preview_packages
 from .reports import as_csv, payload
 from .sessions import Sessions, utc_now
 from .timeline import build_timeline
-from .uploads import FORMATS, UploadError, file_chunks, prepare, safe_upload_name
+from .uploads import FORMATS, UploadError, consume, extension, file_chunks, prepare, safe_upload_name
 
 ASSETS = ROOT / "orca"
 TEMPLATES = Jinja2Templates(directory=ASSETS / "templates")
@@ -57,6 +59,7 @@ TEMPLATES.env.policies["json.dumps_kwargs"] = {"sort_keys": False}
 
 StoredId = Annotated[str, Path(pattern=r"^[a-f0-9]{32}$")]
 CompareId = Annotated[str, Query(pattern=r"^[a-f0-9]{32}$")]
+UuidParam = Annotated[str, Path(pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")]
 
 
 class EngineInfo(BaseModel):
@@ -81,6 +84,70 @@ class HashRecordRequest(BaseModel):
     size: int = Field(ge=0)
     algorithm: str = DEFAULT_ALGORITHM
     hash: str
+
+
+class InvestigationCreateRequest(BaseModel):
+    name: str = ""
+    responsible: str = ""
+    description: str = ""
+    kind: str = "document_analysis"
+    classification: str = "private"
+
+
+class InvestigationUpdateRequest(BaseModel):
+    name: str | None = None
+    responsible: str | None = None
+    description: str | None = None
+    kind: str | None = None
+    classification: str | None = None
+    actor: str | None = None
+
+
+class InvestigationStateRequest(BaseModel):
+    action: str
+    actor: str | None = None
+    summary: str = ""
+    conclusion: str = ""
+    final_notes: str = ""
+    reason: str = ""
+
+
+class InvestigationCompareRequest(BaseModel):
+    file_a_uuid: str
+    file_b_uuid: str
+    actor: str | None = None
+    force: bool = False
+
+
+class InvestigationOrderRequest(BaseModel):
+    file_uuids: list[str]
+    actor: str | None = None
+
+
+class InvestigationRelationRequest(BaseModel):
+    source_file_uuid: str
+    target_file_uuid: str
+    relation_type: str = "manual_confirmed"
+    label: str = ""
+    notes: str = ""
+    actor: str | None = None
+
+
+class InvestigationNoteCreateRequest(BaseModel):
+    text: str = ""
+    target_type: str = "investigation"
+    target_uuid: str | None = None
+    author: str | None = None
+
+
+class InvestigationNoteUpdateRequest(BaseModel):
+    text: str = ""
+    author: str | None = None
+
+
+class InvestigationMatrixBatchRequest(BaseModel):
+    max_pairs: int = 10
+    actor: str | None = None
 
 
 def attachment(name):
@@ -123,6 +190,7 @@ def create_app(settings: Settings | None = None, extractor=None):
             service.workspace.mkdir(mode=0o700)
             service.history.initialize()
             app.state.service = service
+            app.state.investigations = InvestigationService(service.history, service.engine, settings)
             executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="orca")
             app.state.executor = executor
             cleaner = asyncio.create_task(housekeeping(service))
@@ -172,6 +240,10 @@ def create_app(settings: Settings | None = None, extractor=None):
 
     @app.exception_handler(ManifestError)
     async def manifest_error(_request, exc):
+        return JSONResponse({"detail": str(exc)}, status_code=exc.status)
+
+    @app.exception_handler(InvestigationError)
+    async def investigation_error(_request, exc):
         return JSONResponse({"detail": str(exc)}, status_code=exc.status)
 
     @app.get("/", response_class=HTMLResponse)
@@ -637,6 +709,308 @@ def create_app(settings: Settings | None = None, extractor=None):
             raise ManifestError("Faltan campos requeridos para generar el informe de verificación.")
         headers = {"Content-Disposition": attachment("orca-verificacion-manifiesto.html")}
         return TEMPLATES.TemplateResponse(request, "manifest_report.html", {"report": body}, headers=headers)
+
+    # --- Investigations Module API ---
+
+    @app.get("/api/investigations")
+    def list_investigations(request: Request,
+                            q: Annotated[str | None, Query(max_length=200)] = None,
+                            status: Annotated[str | None, Query(max_length=20)] = None,
+                            sort: Literal["updated_at", "created_at"] = "updated_at"):
+        return request.app.state.investigations.list(query=q, status=status, sort=sort)
+
+    @app.post("/api/investigations", status_code=201)
+    def create_investigation(request: Request, body: InvestigationCreateRequest):
+        return request.app.state.investigations.create(
+            name=body.name, responsible=body.responsible, description=body.description,
+            kind=body.kind, classification=body.classification,
+        )
+
+    async def _stage_package_uploads(request: Request):
+        from starlette.formparsers import MultiPartException, MultiPartParser
+
+        body_limit = settings.upload_limit + 1_000_000
+
+        async def bounded():
+            seen = 0
+            async for chunk in request.stream():
+                seen += len(chunk)
+                if seen > body_limit:
+                    raise InvestigationError("Los paquetes superan el límite total de carga.", 413)
+                yield chunk
+
+        parser = MultiPartParser(request.headers, bounded(), max_files=60, max_fields=80, max_part_size=262_144)
+        try:
+            form = await parser.parse()
+        except MultiPartException as exc:
+            raise InvestigationError("Formulario de importación inválido o excede 60 paquetes.", 400) from exc
+        work = request.app.state.service.workspace / f"imp-{uuid4().hex}"
+        work.mkdir(mode=0o700)
+        staged = []
+        try:
+            uploads = form.getlist("packages") or form.getlist("files")
+            if not uploads or any(not isinstance(u, UploadFile) for u in uploads):
+                raise InvestigationError("Selecciona al menos un paquete de investigación (.zip).")
+            actions_raw = form.get("actions")
+            single_action = form.get("action")
+            for idx, up in enumerate(uploads):
+                name = safe_upload_name(up.filename or f"paquete-{idx + 1}.zip")
+                dest = work / f"{idx:03d}-{uuid4().hex}.zip"
+                with dest.open("xb") as out:
+                    consume(file_chunks(up.file), out, MAX_BYTES)
+                staged.append((name, dest))
+            return work, staged, actions_raw, single_action
+        except Exception:
+            shutil.rmtree(work, ignore_errors=True)
+            raise
+        finally:
+            await form.close()
+
+    @app.post("/api/investigations/import/preview")
+    async def preview_investigation_import(request: Request):
+        work, staged, _, _ = await _stage_package_uploads(request)
+        try:
+            items = await to_thread.run_sync(preview_packages, request.app.state.investigations, staged)
+            return {"count": len(items), "items": items}
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
+
+    @app.post("/api/investigations/import")
+    async def import_investigations(request: Request):
+        work, staged, actions_raw, single_action = await _stage_package_uploads(request)
+        try:
+            if actions_raw:
+                try:
+                    actions = json.loads(actions_raw)
+                except ValueError as exc:
+                    raise InvestigationError("El parámetro «actions» debe ser una lista JSON válida.", 400) from exc
+                if not isinstance(actions, list) or len(actions) != len(staged):
+                    raise InvestigationError("La cantidad de acciones debe coincidir con la cantidad de paquetes.")
+            else:
+                default_action = single_action if isinstance(single_action, str) and single_action else "import"
+                actions = [default_action] * len(staged)
+
+            def run_batch():
+                outcomes = []
+                for (name, path), act in zip(staged, actions):
+                    try:
+                        outcomes.append(import_package(request.app.state.investigations, path, name, action=str(act)))
+                    except InvestigationError as exc:
+                        outcomes.append({"filename": name, "outcome": "error", "message": str(exc)})
+                return outcomes
+
+            results = await to_thread.run_sync(run_batch)
+            summary = {
+                "total": len(results),
+                "imported": sum(1 for r in results if r["outcome"] == "imported"),
+                "imported_copy": sum(1 for r in results if r["outcome"] == "imported_copy"),
+                "already_exists": sum(1 for r in results if r["outcome"] == "already_exists"),
+                "conflict": sum(1 for r in results if r["outcome"] == "conflict"),
+                "skipped": sum(1 for r in results if r["outcome"] == "skipped"),
+                "error": sum(1 for r in results if r["outcome"] == "error"),
+            }
+            return {"summary": summary, "results": results}
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
+
+    @app.get("/api/investigations/{inv_uuid}")
+    def get_investigation(request: Request, inv_uuid: UuidParam):
+        return request.app.state.investigations.get(inv_uuid)
+
+    @app.patch("/api/investigations/{inv_uuid}")
+    def update_investigation(request: Request, inv_uuid: UuidParam, body: InvestigationUpdateRequest):
+        return request.app.state.investigations.update(
+            inv_uuid, name=body.name, responsible=body.responsible,
+            description=body.description, kind=body.kind,
+            classification=body.classification, actor=body.actor,
+        )
+
+    @app.delete("/api/investigations/{inv_uuid}", status_code=204)
+    def delete_investigation(request: Request, inv_uuid: UuidParam):
+        request.app.state.investigations.delete_investigation(inv_uuid)
+        return Response(status_code=204)
+
+    @app.post("/api/investigations/{inv_uuid}/state")
+    def change_investigation_state(request: Request, inv_uuid: UuidParam, body: InvestigationStateRequest):
+        return request.app.state.investigations.transition_state(
+            inv_uuid, action=body.action, actor=body.actor,
+            summary=body.summary, conclusion=body.conclusion,
+            final_notes=body.final_notes, reason=body.reason,
+        )
+
+    @app.get("/api/investigations/{inv_uuid}/files")
+    def list_investigation_files(request: Request, inv_uuid: UuidParam):
+        return request.app.state.investigations.list_files(inv_uuid)
+
+    @app.post("/api/investigations/{inv_uuid}/files", status_code=201)
+    async def ingest_investigation_files(request: Request, inv_uuid: UuidParam):
+        service = request.app.state.service
+        inv_service = request.app.state.investigations
+        if not service.engine.info["available"]:
+            raise InvestigationError("ExifTool no está disponible. Consulta las instrucciones de instalación.", 503)
+        # Validate investigation exists and is mutable before buffering upload
+        inv_service.get(inv_uuid)
+        from starlette.formparsers import MultiPartException, MultiPartParser
+
+        body_limit = settings.upload_limit + 512_000
+
+        async def bounded():
+            seen = 0
+            async for chunk in request.stream():
+                seen += len(chunk)
+                if seen > body_limit:
+                    raise InvestigationError("La carga supera el límite total permitido.", 413)
+                yield chunk
+
+        parser = MultiPartParser(request.headers, bounded(), max_files=MAX_FILES, max_fields=MAX_FILES + 4, max_part_size=2048)
+        try:
+            form = await parser.parse()
+        except MultiPartException as exc:
+            raise InvestigationError("Formulario de archivos inválido o supera el límite de 100 archivos.", 400) from exc
+
+        work = service.workspace / f"inv-{uuid4().hex}"
+        work.mkdir(mode=0o700)
+        try:
+            uploads = form.getlist("files")
+            if not uploads or any(not isinstance(u, UploadFile) for u in uploads):
+                raise InvestigationError("Selecciona al menos un archivo para incorporar al expediente.")
+            declared_paths = form.getlist("paths")
+            actor = form.get("actor") if isinstance(form.get("actor"), str) else None
+            if declared_paths and len(declared_paths) != len(uploads):
+                raise InvestigationError("La cantidad de rutas relativas no coincide con los archivos enviados.")
+
+            staged = []
+            for idx, up in enumerate(uploads):
+                name = safe_upload_name(up.filename or f"archivo-{idx + 1}")
+                suffix = extension(name)
+                dest = work / f"{uuid4().hex}.{suffix if suffix in FORMATS else 'bin'}"
+                with dest.open("xb") as out:
+                    size = consume(file_chunks(up.file), out, MAX_BYTES)
+                rel = str(declared_paths[idx]) if declared_paths else None
+                staged.append((dest, name, size, rel))
+        finally:
+            await form.close()
+
+        def process_all():
+            results = []
+            for dest, name, size, rel in staged:
+                results.append(inv_service.ingest_file(inv_uuid, dest, name, size, relative_path=rel, actor=actor))
+            return results
+
+        try:
+            items = await to_thread.run_sync(process_all)
+            return {"count": len(items), "files": items}
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
+
+    @app.post("/api/investigations/{inv_uuid}/files/order")
+    def reorder_investigation_files(request: Request, inv_uuid: UuidParam, body: InvestigationOrderRequest):
+        return request.app.state.investigations.reorder_files(inv_uuid, body.file_uuids, actor=body.actor)
+
+    @app.get("/api/investigations/{inv_uuid}/files/{file_uuid}")
+    def get_investigation_file(request: Request, inv_uuid: UuidParam, file_uuid: UuidParam):
+        return request.app.state.investigations.get_file(inv_uuid, file_uuid)
+
+    @app.delete("/api/investigations/{inv_uuid}/files/{file_uuid}")
+    def remove_investigation_file(request: Request, inv_uuid: UuidParam, file_uuid: UuidParam):
+        return request.app.state.investigations.remove_file(inv_uuid, file_uuid)
+
+    @app.post("/api/investigations/{inv_uuid}/files/{file_uuid}/verify-hash")
+    async def verify_investigation_file_hash(request: Request, inv_uuid: UuidParam, file_uuid: UuidParam):
+        name, size, results, _ = await _stream_hash_upload(request, ["SHA-256"])
+        return request.app.state.investigations.verify_file_hash(
+            inv_uuid, file_uuid, name, size, results[0]["hash"],
+        )
+
+    @app.get("/api/investigations/{inv_uuid}/comparisons")
+    def list_investigation_comparisons(request: Request, inv_uuid: UuidParam):
+        return request.app.state.investigations.list_comparisons(inv_uuid)
+
+    @app.post("/api/investigations/{inv_uuid}/comparisons")
+    async def run_investigation_comparison(request: Request, inv_uuid: UuidParam, body: InvestigationCompareRequest):
+        return await to_thread.run_sync(
+            request.app.state.investigations.compare_pair,
+            inv_uuid, body.file_a_uuid, body.file_b_uuid, body.actor, body.force,
+        )
+
+    @app.get("/api/investigations/{inv_uuid}/comparisons/{comp_uuid}")
+    def get_investigation_comparison(request: Request, inv_uuid: UuidParam, comp_uuid: UuidParam):
+        return request.app.state.investigations.get_comparison(inv_uuid, comp_uuid)
+
+    @app.get("/api/investigations/{inv_uuid}/matrix")
+    def get_investigation_matrix(request: Request, inv_uuid: UuidParam):
+        return request.app.state.investigations.similarity_matrix(inv_uuid)
+
+    @app.post("/api/investigations/{inv_uuid}/matrix/compute")
+    async def compute_investigation_matrix(request: Request, inv_uuid: UuidParam, body: InvestigationMatrixBatchRequest):
+        return await to_thread.run_sync(
+            request.app.state.investigations.compute_matrix_batch,
+            inv_uuid, body.max_pairs, body.actor,
+        )
+
+    @app.get("/api/investigations/{inv_uuid}/timeline/activity")
+    def get_investigation_activity(request: Request, inv_uuid: UuidParam,
+                                   event_type: Annotated[str | None, Query(max_length=64)] = None):
+        return request.app.state.investigations.list_events(inv_uuid, event_type=event_type)
+
+    @app.get("/api/investigations/{inv_uuid}/timeline/documents")
+    def get_investigation_doc_timeline(request: Request, inv_uuid: UuidParam,
+                                       sort: Literal["added", "created", "modified", "manual"] = "added"):
+        return request.app.state.investigations.document_timeline(inv_uuid, sort=sort)
+
+    @app.get("/api/investigations/{inv_uuid}/graph")
+    def get_investigation_graph(request: Request, inv_uuid: UuidParam):
+        return request.app.state.investigations.build_graph(inv_uuid)
+
+    @app.post("/api/investigations/{inv_uuid}/relations", status_code=201)
+    def add_investigation_relation(request: Request, inv_uuid: UuidParam, body: InvestigationRelationRequest):
+        return request.app.state.investigations.add_relation(
+            inv_uuid, body.source_file_uuid, body.target_file_uuid,
+            relation_type=body.relation_type, label=body.label,
+            notes=body.notes, actor=body.actor,
+        )
+
+    @app.delete("/api/investigations/{inv_uuid}/relations/{rel_uuid}", status_code=204)
+    def remove_investigation_relation(request: Request, inv_uuid: UuidParam, rel_uuid: UuidParam):
+        request.app.state.investigations.delete_relation(inv_uuid, rel_uuid)
+        return Response(status_code=204)
+
+    @app.get("/api/investigations/{inv_uuid}/notes")
+    def list_investigation_notes(request: Request, inv_uuid: UuidParam):
+        return request.app.state.investigations.list_notes(inv_uuid)
+
+    @app.post("/api/investigations/{inv_uuid}/notes", status_code=201)
+    def create_investigation_note(request: Request, inv_uuid: UuidParam, body: InvestigationNoteCreateRequest):
+        return request.app.state.investigations.create_note(
+            inv_uuid, body.text, target_type=body.target_type,
+            target_uuid=body.target_uuid, author=body.author,
+        )
+
+    @app.patch("/api/investigations/{inv_uuid}/notes/{note_uuid}")
+    def update_investigation_note(request: Request, inv_uuid: UuidParam, note_uuid: UuidParam,
+                                  body: InvestigationNoteUpdateRequest):
+        return request.app.state.investigations.update_note(inv_uuid, note_uuid, body.text, author=body.author)
+
+    @app.post("/api/investigations/{inv_uuid}/manifest")
+    def generate_investigation_manifest(request: Request, inv_uuid: UuidParam):
+        return request.app.state.investigations.generate_manifest(inv_uuid)
+
+    @app.get("/api/investigations/{inv_uuid}/report/{kind}")
+    def export_investigation_report(request: Request, inv_uuid: UuidParam, kind: Literal["json", "html"]):
+        report = request.app.state.investigations.build_report(inv_uuid)
+        headers = {"Content-Disposition": attachment(f"orca-informe-{inv_uuid[:8]}.{kind}")}
+        if kind == "json":
+            return JSONResponse(report, headers=headers)
+        return TEMPLATES.TemplateResponse(request, "investigation_report.html", {"report": report}, headers=headers)
+
+    @app.get("/api/investigations/{inv_uuid}/export")
+    async def export_investigation_package(request: Request, inv_uuid: UuidParam):
+        data, filename = await to_thread.run_sync(export_investigation_zip, request.app.state.investigations, inv_uuid)
+        return Response(
+            data,
+            media_type="application/zip",
+            headers={"Content-Disposition": attachment(filename)},
+        )
 
     return app
 

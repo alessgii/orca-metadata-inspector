@@ -2,6 +2,7 @@ import shutil
 import sys
 
 from .analysis import inspect_file
+from .duel_engine import verify_cleaned_image
 from .exposure import analyze_exposure, exposure_difference
 from .extraction import EngineError, run_command
 from .metadata import compare
@@ -37,6 +38,10 @@ def clean(source, target, record, extractor, settings):
     after = inspect_file(Input(record["name"], target, target.stat().st_size), extractor, settings, expected=kind)
     if after["status"] not in {"ok", "empty"}:
         raise EngineError("La copia no superó la extracción de verificación.")
+    image_verification = None
+    if kind in {"JPEG", "PNG"}:
+        image_verification = verify_cleaned_image(record, after, source, target)
     return {"after": after, "comparison": compare(record["raw"], after["raw"]), "policy": POLICIES[kind],
             "exposure_comparison": exposure_difference(analyze_exposure(record), analyze_exposure(after)),
+            "image_verification": image_verification,
             "limits": "La comparación abarca los campos que ExifTool leyó. Pueden persistir datos en el contenido, en partes incrustadas o en campos que el extractor no reconoce."}

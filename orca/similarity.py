@@ -11,6 +11,36 @@ WEIGHT_PROFILES = {
         "structure": 0.15,
         "metadata": 0.10,
     },
+    "PDF": {
+        "text": 0.55,
+        "media": 0.15,
+        "structure": 0.20,
+        "metadata": 0.10,
+    },
+    "DOCX": {
+        "text": 0.55,
+        "media": 0.15,
+        "structure": 0.20,
+        "metadata": 0.10,
+    },
+    "XLSX": {
+        "text": 0.65,  # Populated cells & formulas (never inflated by empty cells)
+        "media": 0.0,
+        "structure": 0.25,
+        "metadata": 0.10,
+    },
+    "XLS": {
+        "text": 0.65,
+        "media": 0.0,
+        "structure": 0.25,
+        "metadata": 0.10,
+    },
+    "SPREADSHEET": {
+        "text": 0.65,
+        "media": 0.0,
+        "structure": 0.25,
+        "metadata": 0.10,
+    },
 }
 
 DIMENSION_LABELS = {
@@ -127,49 +157,84 @@ def compute_similarity(binary_identity: dict, content: dict, metadata_rows: list
             },
         }
 
-    # Content was analyzed for a supported format (e.g. PPTX)
+    # Content was analyzed for a supported format (PPTX, PDF, DOCX, XLS, XLSX, SPREADSHEET)
     summary = content["summary"]
     metrics = content["metrics"]
+    is_pptx = fmt == "PPTX"
+    is_spreadsheet = fmt in {"XLS", "XLSX", "SPREADSHEET"}
 
-    # Text dimension
+    # Text / Data dimension
     text_m = metrics["text"]
+    text_label = "Datos y fórmulas (celdas pobladas)" if is_spreadsheet else DIMENSION_LABELS["text"]
     if text_m["available"]:
-        text_has_diff = (
-            summary["modified_slides"] > 0
-            and any(not s["text_identical"] for s in content["slides"])
-        ) or summary["added_slides"] > 0 or summary["removed_slides"] > 0
+        if is_pptx:
+            text_has_diff = (
+                summary["modified_slides"] > 0
+                and any(not s["text_identical"] for s in content["slides"])
+            ) or summary["added_slides"] > 0 or summary["removed_slides"] > 0
+            text_reason = "Promedio de similitud léxica y de caracteres sobre diapositivas alineadas (incluye tablas y notas)."
+        elif fmt == "PDF":
+            text_has_diff = (
+                summary["modified_pages"] > 0 or summary["added_pages"] > 0 or summary["removed_pages"] > 0
+            )
+            text_reason = "Similitud sobre texto extraíble por página (excluyendo encabezados/pies repetidos)."
+        elif fmt == "DOCX":
+            text_has_diff = (
+                summary["modified_paragraphs"] > 0 or summary["added_paragraphs"] > 0 or summary["removed_paragraphs"] > 0
+            )
+            text_reason = "Similitud textual sobre párrafos, encabezados, pies y notas del paquete OOXML."
+        else:
+            text_has_diff = summary["modified_cells"] > 0
+            text_reason = (
+                f"{summary['matching_cells']} de {summary['populated_cells_union']} celdas pobladas coinciden "
+                "(las celdas vacías nunca inflan el porcentaje)."
+            )
         dimensions["text"] = {
             "id": "text",
-            "label": DIMENSION_LABELS["text"],
+            "label": text_label,
             "available": True,
             "score": text_m["score"],
             "percentage": _pct(text_m["score"], has_difference=text_has_diff),
-            "reason": "Promedio de similitud léxica y de caracteres sobre diapositivas alineadas (incluye tablas y notas).",
+            "reason": text_reason,
         }
     else:
         dimensions["text"] = {
             "id": "text",
-            "label": DIMENSION_LABELS["text"],
+            "label": text_label,
             "available": False,
             "score": None,
             "percentage": None,
-            "reason": "Ninguno de los documentos contiene texto extraíble en sus diapositivas.",
+            "reason": (
+                "No se detectó texto extraíble (posible PDF escaneado)."
+                if fmt == "PDF" else
+                "No se detectaron celdas pobladas comparables."
+                if is_spreadsheet else
+                "Ninguno de los documentos contiene texto extraíble."
+            ),
         }
-        not_analyzed.append(DIMENSION_LABELS["text"])
+        not_analyzed.append(text_label)
 
     # Media dimension
     media_m = metrics["media"]
-    if media_m["available"]:
-        media_has_diff = (
-            summary["media_added"] > 0 or summary["media_removed"] > 0 or summary["media_replaced_on_slides"] > 0
-        )
+    if media_m["available"] and WEIGHT_PROFILES[fmt].get("media", 0) > 0:
+        if is_pptx:
+            media_has_diff = (
+                summary["media_added"] > 0 or summary["media_removed"] > 0 or summary["media_replaced_on_slides"] > 0
+            )
+            media_reason = "Comparación de recursos multimedia por huella SHA-256 (60% inventario global, 40% ubicación por diapositiva)."
+        elif fmt == "PDF":
+            media_has_diff = summary["images_shared"] != max(summary["images_a"], summary["images_b"])
+            media_reason = "Comparación de imágenes XObject incrustadas mediante huella SHA-256."
+        else:
+            media_has_diff = summary.get("media_added", 0) > 0 or summary.get("media_removed", 0) > 0
+            media_reason = "Comparación de recursos multimedia incrustados en word/media mediante SHA-256."
         dimensions["media"] = {
             "id": "media",
             "label": DIMENSION_LABELS["media"],
             "available": True,
             "score": media_m["score"],
             "percentage": _pct(media_m["score"], has_difference=media_has_diff),
-            "reason": "Comparación de recursos multimedia por huella SHA-256 (60% inventario global, 40% ubicación por diapositiva).",
+            "reason": media_reason,
         }
     else:
         dimensions["media"] = {
@@ -178,24 +243,54 @@ def compute_similarity(binary_identity: dict, content: dict, metadata_rows: list
             "available": False,
             "score": None,
             "percentage": None,
-            "reason": "Ninguno de los documentos contiene imágenes ni recursos multimedia incrustados.",
+            "reason": (
+                "No aplicable a libros de cálculo." if is_spreadsheet
+                else "Ninguno de los documentos contiene imágenes ni recursos multimedia incrustados."
+            ),
         }
         not_analyzed.append(DIMENSION_LABELS["media"])
 
     # Structure dimension
     struct_m = metrics["structure"]
-    struct_has_diff = (
-        summary["slide_count_a"] != summary["slide_count_b"]
-        or summary["reordered_slides"] > 0
-        or summary["structural_changes_count"] > 0
-    )
+    if is_pptx:
+        struct_has_diff = (
+            summary["slide_count_a"] != summary["slide_count_b"]
+            or summary["reordered_slides"] > 0
+            or summary["structural_changes_count"] > 0
+        )
+        struct_reason = "Combina cantidad de diapositivas (35%), preservación de orden (30%) y elementos estructurales por diapositiva (35%)."
+    elif fmt == "PDF":
+        struct_has_diff = (
+            summary["page_count_a"] != summary["page_count_b"]
+            or summary["reordered_pages"] > 0
+            or summary["structural_changes_count"] > 0
+        )
+        struct_reason = "Evalúa cantidad de páginas, orden, anotaciones, marcadores, adjuntos y versión PDF."
+    elif fmt == "DOCX":
+        struct_has_diff = (
+            summary["paragraphs_a"] != summary["paragraphs_b"]
+            or summary["modified_tables"] > 0
+            or summary["structural_changes_count"] > 0
+        )
+        struct_reason = "Evalúa estructura de párrafos, tablas, encabezados/pies, notas, enlaces y formato."
+    else:
+        struct_has_diff = (
+            summary["sheets_a"] != summary["sheets_b"]
+            or bool(summary["added_sheets"])
+            or bool(summary["removed_sheets"])
+            or bool(summary["renamed_sheets"])
+            or bool(summary["reordered_sheets"])
+            or summary["structural_changes_count"] > 0
+        )
+        struct_reason = "Evalúa cantidad, nombres, orden, visibilidad y celdas combinadas de las hojas."
+
     dimensions["structure"] = {
         "id": "structure",
         "label": DIMENSION_LABELS["structure"],
         "available": True,
         "score": struct_m["score"],
         "percentage": _pct(struct_m["score"], has_difference=struct_has_diff),
-        "reason": "Combina cantidad de diapositivas (35%), preservación de orden (30%) y elementos estructurales por diapositiva (35%).",
+        "reason": struct_reason,
     }
 
     # Metadata dimension
@@ -205,36 +300,66 @@ def compute_similarity(binary_identity: dict, content: dict, metadata_rows: list
 
     # Compute effective weights (redistributing inapplicable dimensions proportionally)
     base_weights = WEIGHT_PROFILES[fmt]
-    active = {k: w for k, w in base_weights.items() if dimensions[k]["available"]}
+    active = {k: w for k, w in base_weights.items() if w > 0 and dimensions[k]["available"]}
     total_w = sum(active.values())
     effective_weights = {k: round(w / total_w, 6) for k, w in active.items()} if total_w > 0 else {}
 
     weighted_score = sum(dimensions[k]["score"] * effective_weights[k] for k in effective_weights)
 
     # Identify significant changes explicitly so high percentages never hide material edits
-    text_modified_slides = [s for s in content["slides"] if s["status"] == "modified" and not s["text_identical"]]
-    if text_modified_slides:
-        significant_changes.append(
-            f"{len(text_modified_slides)} diapositiva(s) con texto modificado."
-        )
-    if summary["added_slides"]:
-        significant_changes.append(f"{summary['added_slides']} diapositiva(s) agregada(s) en B.")
-    if summary["removed_slides"]:
-        significant_changes.append(f"{summary['removed_slides']} diapositiva(s) eliminada(s) respecto a A.")
-    if summary["reordered_slides"]:
-        significant_changes.append(f"{summary['reordered_slides']} diapositiva(s) con orden modificado.")
-    if summary["media_replaced_on_slides"]:
-        significant_changes.append(
-            f"{summary['media_replaced_on_slides']} diapositiva(s) con imágenes o recursos sustituidos."
-        )
-    elif summary["media_added"] or summary["media_removed"]:
-        significant_changes.append(
-            f"Cambios en recursos multimedia (+{summary['media_added']} / −{summary['media_removed']})."
-        )
-    if summary["structural_changes_count"]:
-        significant_changes.append(
-            f"{summary['structural_changes_count']} diapositiva(s) con cambios estructurales (formas, tablas, gráficos o diseño)."
-        )
+    if is_pptx:
+        text_modified_slides = [s for s in content["slides"] if s["status"] == "modified" and not s["text_identical"]]
+        if text_modified_slides:
+            significant_changes.append(f"{len(text_modified_slides)} diapositiva(s) con texto modificado.")
+        if summary["added_slides"]:
+            significant_changes.append(f"{summary['added_slides']} diapositiva(s) agregada(s) en B.")
+        if summary["removed_slides"]:
+            significant_changes.append(f"{summary['removed_slides']} diapositiva(s) eliminada(s) respecto a A.")
+        if summary["reordered_slides"]:
+            significant_changes.append(f"{summary['reordered_slides']} diapositiva(s) con orden modificado.")
+        if summary["media_replaced_on_slides"]:
+            significant_changes.append(f"{summary['media_replaced_on_slides']} diapositiva(s) con imágenes o recursos sustituidos.")
+        elif summary["media_added"] or summary["media_removed"]:
+            significant_changes.append(f"Cambios en recursos multimedia (+{summary['media_added']} / −{summary['media_removed']}).")
+        if summary["structural_changes_count"]:
+            significant_changes.append(f"{summary['structural_changes_count']} diapositiva(s) con cambios estructurales (formas, tablas, gráficos o diseño).")
+    elif fmt == "PDF":
+        if summary["modified_pages"]:
+            significant_changes.append(f"{summary['modified_pages']} página(s) con contenido modificado.")
+        if summary["added_pages"]:
+            significant_changes.append(f"{summary['added_pages']} página(s) agregada(s) en B.")
+        if summary["removed_pages"]:
+            significant_changes.append(f"{summary['removed_pages']} página(s) eliminada(s) respecto a A.")
+        if summary["reordered_pages"]:
+            significant_changes.append(f"{summary['reordered_pages']} página(s) reordenada(s).")
+        if summary["structural_changes_count"]:
+            significant_changes.append(f"{summary['structural_changes_count']} cambio(s) estructural(es) en el PDF.")
+    elif fmt == "DOCX":
+        if summary["modified_paragraphs"]:
+            significant_changes.append(f"{summary['modified_paragraphs']} párrafo(s) modificado(s).")
+        if summary["added_paragraphs"]:
+            significant_changes.append(f"{summary['added_paragraphs']} párrafo(s) agregado(s) en B.")
+        if summary["removed_paragraphs"]:
+            significant_changes.append(f"{summary['removed_paragraphs']} párrafo(s) eliminado(s) respecto a A.")
+        if summary["modified_tables"]:
+            significant_changes.append(f"{summary['modified_tables']} tabla(s) modificada(s).")
+        if summary["media_added"] or summary["media_removed"]:
+            significant_changes.append(f"Recursos multimedia modificados (+{summary['media_added']} / −{summary['media_removed']}).")
+    elif is_spreadsheet:
+        if summary["modified_cells"]:
+            significant_changes.append(f"{summary['modified_cells']} celda(s) modificada(s) en el libro.")
+        if summary["formula_diffs"]:
+            significant_changes.append(f"{summary['formula_diffs']} fórmula(s) modificada(s).")
+        if summary["cache_only_diffs"]:
+            significant_changes.append(f"{summary['cache_only_diffs']} celda(s) con valor en caché distinto bajo la misma fórmula.")
+        if summary["added_sheets"]:
+            significant_changes.append(f"Hojas agregadas: {', '.join(summary['added_sheets'])}.")
+        if summary["removed_sheets"]:
+            significant_changes.append(f"Hojas eliminadas: {', '.join(summary['removed_sheets'])}.")
+        if summary["renamed_sheets"]:
+            significant_changes.append(f"{len(summary['renamed_sheets'])} hoja(s) con posible renombrado.")
+
+    warnings.extend(content.get("warnings", []))
 
     meta_counts = meta_dim["counts"]
     meta_diff_count = meta_counts["different"] + meta_counts["only_a"] + meta_counts["only_b"]

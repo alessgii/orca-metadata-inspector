@@ -840,16 +840,39 @@ def _lis_positions(sequence: list[int]) -> set[int]:
 CONTENT_ANALYZERS: dict[str, ContentAnalyzer] = {
     "PPTX": PptxAnalyzer(),
 }
+CROSS_FORMAT_GROUPS = ({"XLS", "XLSX"},)
+
+
+def _register_extended_analyzers():
+    if "PDF" not in CONTENT_ANALYZERS:
+        from .doc_analyzers import DocxAnalyzer, PdfAnalyzer, SpreadsheetAnalyzer
+
+        CONTENT_ANALYZERS["PDF"] = PdfAnalyzer()
+        CONTENT_ANALYZERS["DOCX"] = DocxAnalyzer()
+        CONTENT_ANALYZERS["XLSX"] = SpreadsheetAnalyzer("XLSX")
+        CONTENT_ANALYZERS["XLS"] = SpreadsheetAnalyzer("XLS")
+
+
+def _compatible_formats(fmt_a: str | None, fmt_b: str | None) -> bool:
+    if not fmt_a or not fmt_b:
+        return False
+    if fmt_a == fmt_b:
+        return True
+    return any(fmt_a in grp and fmt_b in grp for grp in CROSS_FORMAT_GROUPS)
 
 
 def detect_verified_format(path: Path, declared_format: str | None, settings: Settings) -> str | None:
     """Confirm actual binary format without trusting file extension alone."""
+    from .xls_reader import is_valid_xls
+
     sig = signatures(path)
     if sig == "ZIP":
         try:
             return office_format(path, ExpansionBudget(settings.expanded_limit))
         except (UploadError, DefusedXmlException, ParseError, *ZIP_ERRORS):
             return None
+    if sig == "OLE":
+        return "XLS" if is_valid_xls(path) else None
     if sig:
         return sig
     return declared_format
@@ -857,6 +880,7 @@ def detect_verified_format(path: Path, declared_format: str | None, settings: Se
 
 def extract_content(path: Path, record: dict, settings: Settings | None = None) -> tuple[dict | None, str | None]:
     """Extract persistable semantic/structural content snapshot without storing original bytes."""
+    _register_extended_analyzers()
     settings = settings or Settings()
     fmt = record.get("format")
     if not fmt or record.get("status") in {"unsupported", "error"}:
@@ -877,6 +901,7 @@ def compare_content(record_a: dict, record_b: dict, path_a: Path | None = None,
                     path_b: Path | None = None, settings: Settings | None = None,
                     extracted_a: dict | None = None, extracted_b: dict | None = None) -> dict:
     """Run extensible format-aware deep content comparison using extracted snapshots or live files."""
+    _register_extended_analyzers()
     settings = settings or Settings()
     fmt_a = record_a.get("format")
     fmt_b = record_b.get("format")
@@ -895,7 +920,7 @@ def compare_content(record_a: dict, record_b: dict, path_a: Path | None = None,
             "limitations": ["No se realizó comparación profunda porque uno de los archivos presentó errores."],
         }
 
-    if fmt_a != fmt_b or not fmt_a:
+    if not _compatible_formats(fmt_a, fmt_b):
         return {
             "status": "unsupported",
             "format": None,
@@ -909,8 +934,9 @@ def compare_content(record_a: dict, record_b: dict, path_a: Path | None = None,
             "limitations": ["No es válido calcular un porcentaje de similitud de contenido entre formatos incompatibles."],
         }
 
-    analyzer = CONTENT_ANALYZERS.get(fmt_a)
-    if analyzer is None:
+    analyzer_a = CONTENT_ANALYZERS.get(fmt_a)
+    analyzer_b = CONTENT_ANALYZERS.get(fmt_b)
+    if analyzer_a is None or analyzer_b is None:
         return {
             "status": "unsupported",
             "format": fmt_a,
@@ -931,7 +957,7 @@ def compare_content(record_a: dict, record_b: dict, path_a: Path | None = None,
     if (isinstance(extracted_a, dict) and isinstance(extracted_b, dict)
             and extracted_a.get("format") == fmt_a and extracted_b.get("format") == fmt_b):
         try:
-            result = analyzer.compare(extracted_a, extracted_b)
+            result = analyzer_a.compare(extracted_a, extracted_b)
             result["supported_formats"] = sorted(CONTENT_ANALYZERS)
             return result
         except (ContentError, KeyError, TypeError, ValueError) as exc:
@@ -980,9 +1006,9 @@ def compare_content(record_a: dict, record_b: dict, path_a: Path | None = None,
         }
 
     try:
-        snap_a = analyzer.extract(path_a, settings)
-        snap_b = analyzer.extract(path_b, settings)
-        result = analyzer.compare(snap_a, snap_b)
+        snap_a = analyzer_a.extract(path_a, settings)
+        snap_b = analyzer_b.extract(path_b, settings)
+        result = analyzer_a.compare(snap_a, snap_b)
         result["supported_formats"] = sorted(CONTENT_ANALYZERS)
         return result
     except ContentError as exc:

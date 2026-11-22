@@ -14,8 +14,9 @@ from defusedxml.common import DefusedXmlException
 from xml.etree.ElementTree import ParseError
 
 from .config import CHUNK, MAX_BYTES, MAX_FILES, Settings
+from .xls_reader import OLE_SIGNATURE, is_valid_xls
 
-FORMATS = {"pdf": "PDF", "docx": "DOCX", "xlsx": "XLSX", "pptx": "PPTX", "jpg": "JPEG",
+FORMATS = {"pdf": "PDF", "docx": "DOCX", "xlsx": "XLSX", "xls": "XLS", "pptx": "PPTX", "jpg": "JPEG",
            "jpeg": "JPEG", "png": "PNG", "webp": "WEBP"}
 OOXML = {"DOCX": "word/document.xml", "XLSX": "xl/workbook.xml", "PPTX": "ppt/presentation.xml"}
 MAIN_TYPES = {
@@ -74,6 +75,8 @@ def signatures(path):
         return "WEBP"
     if head.startswith((b"PK\x03\x04", b"PK\x05\x06")):
         return "ZIP"
+    if head.startswith(OLE_SIGNATURE):
+        return "OLE"
     return None
 
 
@@ -276,6 +279,11 @@ def identify(file, settings, expansion=None):
             matched = office_format(file.path, expansion or ExpansionBudget(settings.expanded_limit))
         except (UploadError, DefusedXmlException, ParseError, *ZIP_ERRORS) as exc:
             return None, str(exc) if isinstance(exc, UploadError) else "Paquete Office corrupto o inseguro."
+    elif matched == "OLE" and requested == "XLS":
+        if is_valid_xls(file.path):
+            matched = "XLS"
+        else:
+            return None, "El archivo OLE2/CFBF está corrupto o no contiene un libro Excel XLS válido."
     if matched != requested:
         return None, "El contenido no coincide con la extensión indicada."
     return matched, None

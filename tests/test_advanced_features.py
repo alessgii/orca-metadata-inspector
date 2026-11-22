@@ -334,10 +334,10 @@ def test_pptx_same_text_different_images_warns_explicitly(client, tmp_path):
 
 
 def test_unsupported_formats_and_corrupt_files_do_not_emit_misleading_similarity(client, samples, tmp_path):
-    # Unsupported format pair (PDF vs PDF)
+    # Incompatible format pair (PDF vs DOCX) must not emit misleading document similarity
     base, session = complete(client, upload(client, [
         ("a.pdf", samples["pdf"].read_bytes()),
-        ("b.pdf", samples["pdf"].read_bytes()),
+        ("b.docx", samples["docx"].read_bytes()),
     ]))
     duel = client.get(f"{base}/duel", params={
         "file_a": session["files"][0]["id"],

@@ -5,6 +5,7 @@ from collections import Counter, defaultdict
 from decimal import Decimal
 
 from .content import compare_content
+from .duel_engine import orchestrate_universal_dimensions
 from .metadata import SEMANTIC_LABELS, interpreted_field, properties, raw_value, semantic_field, technical
 from .similarity import compute_similarity
 from .timeline import date_context, date_kind
@@ -148,7 +149,7 @@ def binary_identity_summary(first, second):
 
 
 def compare_files(first, second, path_a=None, path_b=None, settings=None,
-                  extracted_a=None, extracted_b=None):
+                  extracted_a=None, extracted_b=None, profile_a=None, profile_b=None):
     a, b = entries(first), entries(second)
     rows = []
     keys = [*GENERAL, *sorted((a.keys() | b.keys()) - GENERAL.keys())]
@@ -217,6 +218,10 @@ def compare_files(first, second, path_a=None, path_b=None, settings=None,
         "technical_count": len(technical_rows),
         "note": "Las diferencias en metadatos (autor, fechas, software, IDs) son independientes del contenido visible del documento.",
     }
+    universal = orchestrate_universal_dimensions(
+        first, second, binary_identity, content, metadata_comparison, similarity,
+        path_a=path_a, path_b=path_b, profile_a=profile_a, profile_b=profile_b,
+    )
     return {
         "a": {key: first.get(key) for key in ("id", "name", "status", *GENERAL)},
         "b": {key: second.get(key) for key in ("id", "name", "status", *GENERAL)},
@@ -227,4 +232,5 @@ def compare_files(first, second, path_a=None, path_b=None, settings=None,
         "content_comparison": content,
         "metadata_comparison": metadata_comparison,
         "similarity": similarity,
+        **universal,
     }

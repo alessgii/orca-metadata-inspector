@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'">
+  <title>Duelo múltiple ({{ result.file_count }} archivos) | Orca</title>
+</head>
+<body>
+<main>
+  <h1>Informe de Duelo universal ({{ result.file_count }} archivos)</h1>
+  <p>Sesión: <code>{{ result.session_id }}</code> · Modo: {{ result.mode }} · Orquestador v{{ result.orchestrator_version }}</p>
+
+  <section>
+    <h2>1. Resumen y metodología</h2>
+    <p>{{ result.methodology.strategy }}</p>
+    <ul>
+      <li>Parejas posibles: {{ result.methodology.possible_pairs }}</li>
+      <li>Parejas evaluadas profundamente: {{ result.methodology.evaluated_deep_pairs }}</li>
+      <li>Parejas pendientes: {{ result.methodology.pending_pairs }}</li>
+      <li>Parejas no aplicables: {{ result.methodology.not_applicable_pairs }}</li>
+      <li>Errores: {{ result.counts.error }}</li>
+    </ul>
+    <p><em>Nota: un conjunto con parejas pendientes constituye una evaluación parcial y no debe interpretarse como comparación exhaustiva de todas las parejas.</em></p>
+  </section>
+
+  <section>
+    <h2>2. Inventario de archivos</h2>
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Archivo</th>
+          <th scope="col">Formato</th>
+          <th scope="col">Tamaño</th>
+          <th scope="col">SHA-256</th>
+          <th scope="col">Características</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for item in result.inventory %}
+        <tr>
+          <td>{{ item.name }}</td>
+          <td>{{ item.format or 'Sin confirmar' }}</td>
+          <td>{{ item.size }} B</td>
+          <td><code>{{ item.sha256 or '—' }}</code></td>
+          <td>
+            {% if item.image_summary %}
+              {% if item.image_summary.error %}Error: {{ item.image_summary.error }}
+              {% else %}{{ item.image_summary.width }}×{{ item.image_summary.height }} · {{ item.image_summary.mode }} ({{ item.image_summary.bit_depth }}b) · pHash {{ item.image_summary.phash }}{% endif %}
+            {% else %}
+              {{ item.capabilities|join(', ') }}
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>3. Grupos y relaciones detectadas</h2>
+    <h3>Duplicados binarios ({{ result.groups.binary_duplicates|length }})</h3>
+    {% if result.groups.binary_duplicates %}
+    <ul>
+      {% for g in result.groups.binary_duplicates %}
+      <li>SHA-256 <code>{{ g.sha256 }}</code>: {{ g.count }} archivos</li>
+      {% endfor %}
+    </ul>
+    {% else %}<p>No se detectaron duplicados binarios.</p>{% endif %}
+
+    <h3>Contenido equivalente ({{ result.groups.equivalent_content|length }})</h3>
+    {% if result.groups.equivalent_content %}
+    <ul>
+      {% for g in result.groups.equivalent_content %}
+      <li>Huella visual <code>{{ g.fingerprint }}</code> ({{ g.dimensions }}): {{ g.count }} archivos</li>
+      {% endfor %}
+    </ul>
+    {% else %}<p>No se detectaron grupos de contenido equivalente con bytes distintos.</p>{% endif %}
+
+    <h3>Candidatos perceptuales ({{ result.groups.perceptual_candidates|length }} pareja(s))</h3>
+    <p>{{ result.groups.non_transitivity_note }}</p>
+    {% if result.groups.perceptual_candidates %}
+    <ul>
+      {% for p in result.groups.perceptual_candidates %}
+      <li>{{ p.file_a_id[:8] }} ↔ {{ p.file_b_id[:8] }} (pHash: {{ p.phash_distance }}/64, dHash: {{ p.dhash_distance }}/64)</li>
+      {% endfor %}
+    </ul>
+    {% else %}<p>Sin candidatos perceptuales adicionales.</p>{% endif %}
+  </section>
+
+  <section>
+    <h2>4. Matriz de comparaciones ({{ result.cells|length }} parejas)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Archivo A</th>
+          <th scope="col">Archivo B</th>
+          <th scope="col">Estado</th>
+          <th scope="col">Resultado</th>
+          <th scope="col">Detalle</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% set names = {} %}
+      {% for item in result.inventory %}{% set _ = names.update({item.id: item.name}) %}{% endfor %}
+      {% for c in result.cells %}
+        <tr>
+          <td>{{ names[c.file_a_id] }}</td>
+          <td>{{ names[c.file_b_id] }}</td>
+          <td>{{ c.state }}</td>
+          <td>{{ c.label }}</td>
+          <td>{{ c.detail }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</main>
+</body>
+</html>

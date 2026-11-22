@@ -793,11 +793,31 @@ function cleanupView(view) {
     box.append(warning);
   }
   if (view.cleaned) {
-    const {after, comparison, policy, limits, exposure_comparison: exposure} = view.cleaned;
+    const {after, comparison, policy, limits, exposure_comparison: exposure, image_verification: imgVer} = view.cleaned;
     box.append(element("p", "", policy), element("p", UI.smallMuted, limits),
       link("Descargar copia saneada", filePath(view.session.id, view.record.id) + "/copy", "button primary"),
       element("p", UI.small, "SHA-256 de la copia"),
       element("code", UI.code, after.sha256));
+    if (imgVer) {
+      const badge = element("span", UI.status,
+        imgVer.pixels_preserved === true ? "Píxeles conservados"
+          : imgVer.pixels_preserved === false ? "Píxeles modificados" : "No verificable");
+      badge.dataset.status = imgVer.pixels_preserved === true ? "ok" : imgVer.pixels_preserved === false ? "error" : "unsupported";
+      const verBox = element("section", UI.callout,
+        element("div", "flex items-center gap-2 flex-wrap",
+          element("strong", "", "Verificación visual tras limpieza"), badge),
+        element("p", UI.small, imgVer.verdict));
+      if (typeof imgVer.different_pixels === "number") {
+        verBox.append(element("p", UI.smallMuted,
+          "Píxeles diferentes: " + numbers.format(imgVer.different_pixels)
+          + (typeof imgVer.ssim === "number" ? " · SSIM: " + imgVer.ssim.toFixed(4) : "")));
+      }
+      if (imgVer.structural_differences?.length) {
+        verBox.append(element("ul", UI.duelNotes + " text-[0.875rem] text-muted",
+          ...imgVer.structural_differences.map((d) => element("li", "", element("strong", "", d.label + ": "), d.detail))));
+      }
+      box.append(verBox);
+    }
     if (exposure) box.append(exposureComparisonView(exposure));
     for (const [key, name] of Object.entries({removed: "Eliminados", changed: "Modificados",
       retained: "Persistentes", added: "Añadidos"})) {

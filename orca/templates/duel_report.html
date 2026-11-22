@@ -66,8 +66,8 @@
 
   {% if result.content_comparison %}
   <section>
-    <h2>3. Diferencias profundas de contenido</h2>
-    {% if result.content_comparison.status == 'analyzed' %}
+    <h2>3. Diferencias profundas de contenido ({{ result.content_comparison.format or 'General' }})</h2>
+    {% if result.content_comparison.status == 'analyzed' and result.content_comparison.format == 'PPTX' %}
     {% set cs = result.content_comparison.summary %}
     <p>
       Diapositivas A: {{ cs.slide_count_a }} | Diapositivas B: {{ cs.slide_count_b }} |
@@ -122,8 +122,105 @@
       {% endfor %}
     </ul>
     {% endif %}
+    {% elif result.content_comparison.status == 'analyzed' and result.content_comparison.format == 'PDF' %}
+    {% set cs = result.content_comparison.summary %}
+    <p>Páginas A: {{ cs.page_count_a }} | Páginas B: {{ cs.page_count_b }} | Idénticas: {{ cs.identical_pages }} | Modificadas: {{ cs.modified_pages }} | Reordenadas: {{ cs.reordered_pages }} | Agregadas: {{ cs.added_pages }} | Eliminadas: {{ cs.removed_pages }}.</p>
+    {% for p in result.content_comparison.pages %}
+    {% if p.status != 'identical' %}
+    <article>
+      <h3>Página {% if p.page_a %}A:{{ p.page_a }}{% endif %}{% if p.page_a and p.page_b %} → {% endif %}{% if p.page_b %}B:{{ p.page_b }}{% endif %} — {{ p.status }}</h3>
+      {% if p.changes %}<p>{{ p.changes|join(' · ') }}</p>{% endif %}
+      {% if p.text_a or p.text_b %}<p><strong>A:</strong> {{ p.text_a or '—' }}</p><p><strong>B:</strong> {{ p.text_b or '—' }}</p>{% endif %}
+    </article>
+    {% endif %}
+    {% endfor %}
+    {% elif result.content_comparison.status == 'analyzed' and result.content_comparison.format == 'DOCX' %}
+    {% set cs = result.content_comparison.summary %}
+    <p>Párrafos A: {{ cs.paragraphs_a }} | B: {{ cs.paragraphs_b }} | Modificados: {{ cs.modified_paragraphs }} | Agregados: {{ cs.added_paragraphs }} | Eliminados: {{ cs.removed_paragraphs }} | Tablas modificadas: {{ cs.modified_tables }}.</p>
+    {% for p in result.content_comparison.paragraph_diffs[:100] %}
+    <article>
+      <h3>Párrafo {{ p.status }} (A:{{ p.index_a or '—' }} / B:{{ p.index_b or '—' }})</h3>
+      {% if p.text_a %}<p><strong>A:</strong> {{ p.text_a }}</p>{% endif %}
+      {% if p.text_b %}<p><strong>B:</strong> {{ p.text_b }}</p>{% endif %}
+    </article>
+    {% endfor %}
+    {% if result.content_comparison.table_diffs %}
+    <h3>Tablas modificadas</h3>
+    <ul>{% for t in result.content_comparison.table_diffs %}<li>Tabla {{ t.table }} ({{ t.status }}): {{ t.changes|join('; ') }}</li>{% endfor %}</ul>
+    {% endif %}
+    {% elif result.content_comparison.status == 'analyzed' and result.content_comparison.format in ['XLS', 'XLSX', 'SPREADSHEET'] %}
+    {% set cs = result.content_comparison.summary %}
+    <p>Hojas A: {{ cs.sheets_a }} | B: {{ cs.sheets_b }} | Celdas pobladas evaluadas: {{ cs.populated_cells_union }} | Modificadas: {{ cs.modified_cells }} | Fórmulas distintas: {{ cs.formula_diffs }}.</p>
+    {% for sh in result.content_comparison.sheets %}
+    {% if sh.diffs %}
+    <h3>Hoja: {{ sh.name_a }}{% if sh.name_a != sh.name_b %} → {{ sh.name_b }}{% endif %} ({{ sh.modified_cells }} celda(s))</h3>
+    <table>
+      <thead><tr><th scope="col">Celda</th><th scope="col">Valor A</th><th scope="col">Valor B</th><th scope="col">Fórmula A</th><th scope="col">Fórmula B</th><th scope="col">Cambio</th></tr></thead>
+      <tbody>
+      {% for d in sh.diffs[:200] %}
+      <tr><td><code>{{ d.cell }}</code></td><td>{{ d.value_a }}</td><td>{{ d.value_b }}</td><td><code>{{ d.formula_a or '' }}</code></td><td><code>{{ d.formula_b or '' }}</code></td><td>{{ d.change_type }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+    {% endfor %}
     {% else %}
     <p>{{ result.content_comparison.reason }}</p>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% if result.dimensions %}
+  <section>
+    <h2>Capacidades y dimensiones evaluadas</h2>
+    <p>Completitud: <strong>{{ result.completeness }}</strong> · Orquestador v{{ result.orchestrator_version }} · Comparadores ejecutados: {{ result.executed_comparators|join(', ') }}.</p>
+    <ul>
+      {% for dim in result.dimensions %}
+      <li><strong>{{ dim.label }}</strong> ({{ dim.status }}) — {{ dim.algorithm }} v{{ dim.version }}{% if dim.summary %}: {{ dim.summary }}{% endif %}</li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if result.image_comparison %}
+  {% set ic = result.image_comparison %}
+  <section>
+    <h2>Análisis profundo de imágenes (v{{ ic.engine_version }})</h2>
+    {% if ic.status in ['analyzed', 'partial'] %}
+      <h3>Equivalencia de muestras decodificadas</h3>
+      <p>Estado: <strong>{{ ic.decoded_samples.status }}</strong> — {{ ic.decoded_samples.reason or '' }}</p>
+      <h3>Equivalencia visual normalizada</h3>
+      <p>Estado: <strong>{{ ic.visual_normalized.status }}</strong> — {{ ic.visual_normalized.reason or '' }}</p>
+      {% if ic.visual_normalized.different_pixels is not none %}
+      <p>Píxeles diferentes: {{ ic.visual_normalized.different_pixels }} / {{ ic.visual_normalized.total_pixels }} ({{ ic.visual_normalized.different_percent }}%).</p>
+      {% endif %}
+      {% if ic.visual_normalized.policy %}
+      <p>Política: {{ ic.visual_normalized.policy.orientation }} {{ ic.visual_normalized.policy.color_management }} {{ ic.visual_normalized.policy.transparency }}</p>
+      {% endif %}
+      <h3>Similitud perceptual</h3>
+      <p>{{ ic.perceptual.band or ic.perceptual.note or '' }}</p>
+      <ul>
+        {% if ic.perceptual.ssim is not none %}<li>SSIM (luminancia): {{ ic.perceptual.ssim }}</li>{% endif %}
+        {% if ic.perceptual.phash_distance is not none %}<li>pHash distancia de Hamming: {{ ic.perceptual.phash_distance }} / 64</li>{% endif %}
+        {% if ic.perceptual.dhash_distance is not none %}<li>dHash distancia de Hamming: {{ ic.perceptual.dhash_distance }} / 64</li>{% endif %}
+        {% if ic.perceptual.mae is not none %}<li>MAE: {{ ic.perceptual.mae }} · MSE: {{ ic.perceptual.mse }} · PSNR: {% if ic.perceptual.psnr_infinite %}∞ (idénticos){% elif ic.perceptual.psnr is not none %}{{ ic.perceptual.psnr }} dB{% else %}—{% endif %}</li>{% endif %}
+      </ul>
+      {% if ic.structural_comparison %}
+      <h3>Inspección estructural</h3>
+      <p>Estado: <strong>{{ ic.structural_comparison.status }}</strong>{% if ic.structural_comparison.reason %} — {{ ic.structural_comparison.reason }}{% endif %}</p>
+      {% if ic.structural_comparison.differences %}
+      <ul>
+        {% for d in ic.structural_comparison.differences %}
+        <li><strong>{{ d.label }}:</strong> {{ d.detail }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      {% endif %}
+      {% if ic.notes %}
+      <ul>{% for n in ic.notes %}<li>{{ n }}</li>{% endfor %}</ul>
+      {% endif %}
+    {% else %}
+      <p>Estado: <strong>{{ ic.status }}</strong> — {{ ic.reason }}</p>
     {% endif %}
   </section>
   {% endif %}

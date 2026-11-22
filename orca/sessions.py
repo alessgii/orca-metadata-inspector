@@ -34,6 +34,9 @@ class Job:
     records: list[dict] = field(default_factory=list)
     sources: dict = field(default_factory=dict)
     copies: dict = field(default_factory=dict)
+    image_profiles: dict = field(default_factory=dict)
+    duel_cache: dict = field(default_factory=dict)
+    duel_batch: object = None
     state: str = "queued"
     started: float = field(default_factory=time.monotonic)
     expires: float = float("inf")

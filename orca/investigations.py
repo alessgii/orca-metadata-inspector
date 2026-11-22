@@ -13,8 +13,10 @@ from .analysis import inspect_file
 from .config import CHUNK, Settings
 from .content import CONTENT_ANALYZERS, extract_content
 from .duel import compare_files
+from .duel_engine import IMAGE_FORMATS
 from .exposure import analyze_exposure
 from .hashes import AUTHENTICITY_NOTE, hash_chunks, normalize_algorithm
+from .image_analysis import extract_image_profile
 from .manifests import build_manifest, normalize_relative_path
 from .similarity import ALGORITHM_VERSION as SIMILARITY_VERSION
 from .storage import History
@@ -540,6 +542,11 @@ class InvestigationService:
         else:
             record = inspect_file(Input(clean_name, temp_path, size), self.engine, self.settings)
             structure, structure_warning = extract_content(temp_path, record, self.settings)
+            if structure is None and record.get("format") in IMAGE_FORMATS:
+                img_prof = extract_image_profile(temp_path, expected_format=record["format"])
+                structure = {"kind": "image_profile", "format": record["format"], "profile": img_prof}
+                if img_prof.get("warnings"):
+                    record["warnings"] = list(dict.fromkeys([*record["warnings"], *img_prof["warnings"]]))
             if structure_warning:
                 record["warnings"] = [*record["warnings"], structure_warning]
             engine_info = self.engine.info
@@ -862,15 +869,23 @@ class InvestigationService:
             rec_a, struct_a = self._load_file_for_duel(db, inv["uuid"], a_uuid)
             rec_b, struct_b = self._load_file_for_duel(db, inv["uuid"], b_uuid)
 
+            prof_a = struct_a["profile"] if isinstance(struct_a, dict) and struct_a.get("kind") == "image_profile" else None
+            prof_b = struct_b["profile"] if isinstance(struct_b, dict) and struct_b.get("kind") == "image_profile" else None
+            ext_a = None if prof_a is not None else struct_a
+            ext_b = None if prof_b is not None else struct_b
+
             result = compare_files(
                 rec_a, rec_b, settings=self.settings,
-                extracted_a=struct_a, extracted_b=struct_b,
+                extracted_a=ext_a, extracted_b=ext_b,
+                profile_a=prof_a, profile_b=prof_b,
             )
             now = utc_now()
             comp_uuid = new_uuid()
             algorithms = ["SHA-256", "ExifTool-semantic"]
             if result["content_comparison"]["status"] == "analyzed":
                 algorithms.append(f"{result['content_comparison']['format']}-content-v{SIMILARITY_VERSION}")
+            if result.get("image_comparison") and result["image_comparison"].get("status") in {"analyzed", "partial"}:
+                algorithms.append(f"image-profile-v{result['image_comparison'].get('engine_version', '1.0')}")
             limitations = [
                 *result["binary_identity"].get("notes", []),
                 *result["similarity"]["methodology"].get("caveats", []),
@@ -1606,14 +1621,35 @@ class InvestigationService:
 def _summarize_structure(structure: dict | None) -> dict | None:
     if not isinstance(structure, dict):
         return None
-    if structure.get("format") == "PPTX":
+    fmt = structure.get("format")
+    if fmt == "PPTX":
         return {
             "format": "PPTX",
             "slide_count": structure.get("slide_count", 0),
             "media_count": len(structure.get("media", [])),
             "titles": [s.get("title") for s in structure.get("slides", []) if s.get("title")][:10],
         }
-    return {"format": structure.get("format")}
+    if fmt == "PDF":
+        return {
+            "format": "PDF",
+            "page_count": structure.get("page_count", 0),
+            "media_count": len(structure.get("images", [])),
+            "scanned_likely": structure.get("scanned_likely", False),
+        }
+    if fmt == "DOCX":
+        return {
+            "format": "DOCX",
+            "paragraph_count": len(structure.get("paragraphs", [])),
+            "table_count": len(structure.get("tables", [])),
+            "media_count": len(structure.get("media", [])),
+        }
+    if fmt in {"XLS", "XLSX"}:
+        return {
+            "format": fmt,
+            "sheet_count": structure.get("sheet_count", 0),
+            "total_cells": structure.get("total_cells", 0),
+        }
+    return {"format": fmt}
 
 
 def _dict_factory(cursor, row):

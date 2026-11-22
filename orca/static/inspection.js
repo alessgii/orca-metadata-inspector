@@ -617,6 +617,523 @@ function deepDiffSection(content, similarity) {
   return box;
 }
 
+const dimStatusLabels = {
+  matched: ["Coincidente", "ok"],
+  different: ["Diferente", "unsupported"],
+  not_applicable: ["No aplicable", ""],
+  unsupported: ["No soportado", "unsupported"],
+  pending: ["Pendiente", ""],
+  failed: ["Fallido", "error"],
+  partial: ["Parcial", "unsupported"],
+};
+
+function capabilitiesSummarySection(result) {
+  if (!result.dimensions?.length) return null;
+  const box = element("section", UI.duelSection);
+  const compBadge = element("span", UI.status,
+    result.completeness === "complete" ? "Evaluación completa" : "Evaluación parcial");
+  compBadge.dataset.status = result.completeness === "complete" ? "ok" : "unsupported";
+
+  box.append(
+    element("div", UI.duelHead,
+      element("div", "flex items-center gap-2 flex-wrap",
+        element("h2", UI.h2, "Capacidades detectadas automáticamente"), compBadge),
+      element("span", UI.smallMuted + " font-mono",
+        "Orquestador v" + (result.orchestrator_version || "1.0") + " · " + (result.executed_comparators || []).join(", "))),
+    element("div", "grid grid-cols-3 max-[1100px]:grid-cols-2 max-[540px]:grid-cols-1 gap-2.5",
+      ...result.dimensions.map((d) => {
+        const [txt, tone] = dimStatusLabels[d.status] || [d.status, ""];
+        const b = element("span", UI.status, txt);
+        if (tone) b.dataset.status = tone;
+        return element("div", "py-2.5 px-3 border border-line rounded-[7px] bg-wash grid grid-cols-[minmax(0,1fr)] gap-1 content-start min-w-0",
+          element("div", "flex items-center justify-between gap-2 flex-wrap",
+            element("strong", UI.small, d.label), b),
+          element("p", UI.smallMuted, d.summary || "—"),
+          element("span", "text-[0.75rem] font-mono text-muted", d.algorithm + " v" + d.version));
+      })));
+  return box;
+}
+
+function imageViewerWidget(result) {
+  const sessionId = result.session_id;
+  const idA = result.a?.id;
+  const idB = result.b?.id;
+  if (!sessionId || !idA || !idB) return null;
+  const ic = result.image_comparison;
+  if (!ic || ic.status !== "analyzed") return null;
+
+  const urlA = filePath(sessionId, idA) + "/preview";
+  const urlB = filePath(sessionId, idB) + "/preview";
+  const wrap = element("div", "grid grid-cols-[minmax(0,1fr)] gap-3 p-3 border border-line rounded-lg bg-wash");
+
+  let viewMode = "side"; // side | toggle | slider | diff
+  let activeSide = "A";
+  let zoom = 100;
+  let sliderPct = 50;
+  let amplifyDiff = true;
+  let diffPolicy = "normalized";
+
+  const modeBar = element("div", "flex flex-wrap items-center justify-between gap-2");
+  const modeBtns = {};
+  const modeGroup = element("div", UI.subnav + " mb-0");
+  const modes = [
+    ["side", "Lado a lado"],
+    ["toggle", "Alternar A / B"],
+    ["slider", "Deslizador"],
+    ...(ic.diff_map_available ? [["diff", "Mapa de diferencias"]] : []),
+  ];
+  for (const [k, lbl] of modes) {
+    const b = button(lbl, () => { viewMode = k; renderStage(); }, "subnav-tab");
+    modeBtns[k] = b;
+    modeGroup.append(b);
+  }
+
+  const zoomSel = element("select", UI.select);
+  zoomSel.setAttribute("aria-label", "Nivel de zoom");
+  for (const z of [100, 150, 200, 300]) zoomSel.append(new Option("Zoom " + z + "%", String(z)));
+  zoomSel.addEventListener("change", () => { zoom = Number(zoomSel.value); renderStage(); });
+
+  modeBar.append(modeGroup, zoomSel);
+  const stage = element("div", "min-w-0");
+
+  const makeImg = (src, alt) => {
+    const img = element("img", "block max-w-none select-none");
+    img.src = src;
+    img.alt = alt;
+    img.style.width = zoom + "%";
+    return img;
+  };
+
+  const renderStage = () => {
+    for (const [k, b] of Object.entries(modeBtns)) b.setAttribute("aria-selected", String(k === viewMode));
+
+    if (viewMode === "side") {
+      const boxA = element("div", "overflow-auto max-h-[420px] border border-line rounded-md bg-surface", makeImg(urlA, result.a.name));
+      const boxB = element("div", "overflow-auto max-h-[420px] border border-line rounded-md bg-surface", makeImg(urlB, result.b.name));
+      // Synchronized scroll between A and B
+      let syncing = false;
+      const sync = (src, dst) => () => {
+        if (syncing) return;
+        syncing = true;
+        dst.scrollLeft = src.scrollLeft;
+        dst.scrollTop = src.scrollTop;
+        syncing = false;
+      };
+      boxA.addEventListener("scroll", sync(boxA, boxB));
+      boxB.addEventListener("scroll", sync(boxB, boxA));
+      stage.replaceChildren(
+        element("div", "grid grid-cols-2 max-md:grid-cols-1 gap-3",
+          element("div", "grid gap-1 min-w-0", element("span", UI.smallMuted, "Archivo A · " + result.a.name), boxA),
+          element("div", "grid gap-1 min-w-0", element("span", UI.smallMuted, "Archivo B · " + result.b.name), boxB)));
+    } else if (viewMode === "toggle") {
+      const flip = button("Mostrando " + activeSide + " — Cambiar a " + (activeSide === "A" ? "B" : "A"), () => {
+        activeSide = activeSide === "A" ? "B" : "A";
+        renderStage();
+      }, "accent-button small-btn");
+      const box = element("div", "overflow-auto max-h-[440px] border border-line rounded-md bg-surface",
+        makeImg(activeSide === "A" ? urlA : urlB, activeSide === "A" ? result.a.name : result.b.name));
+      stage.replaceChildren(
+        element("div", "flex items-center justify-between gap-2 flex-wrap mb-2",
+          element("span", UI.smallMuted, activeSide === "A" ? "Archivo A · " + result.a.name : "Archivo B · " + result.b.name), flip),
+        box);
+    } else if (viewMode === "slider") {
+      const range = element("input", "w-full accent-accent");
+      range.type = "range";
+      range.min = "0";
+      range.max = "100";
+      range.value = String(sliderPct);
+      range.setAttribute("aria-label", "Posición del deslizador A/B");
+      const imgBase = makeImg(urlB, result.b.name);
+      const imgTop = makeImg(urlA, result.a.name);
+      imgTop.className = "block max-w-none select-none absolute inset-0";
+      imgTop.style.clipPath = `inset(0 ${100 - sliderPct}% 0 0)`;
+      range.addEventListener("input", () => {
+        sliderPct = Number(range.value);
+        imgTop.style.clipPath = `inset(0 ${100 - sliderPct}% 0 0)`;
+      });
+      const frame = element("div", "relative overflow-auto max-h-[440px] border border-line rounded-md bg-surface", imgBase, imgTop);
+      stage.replaceChildren(
+        element("div", "grid gap-2",
+          element("div", "flex items-center justify-between text-[0.8rem] text-muted",
+            element("span", "", "← Archivo A"), element("span", "", "Archivo B →")),
+          range, frame));
+    } else if (viewMode === "diff") {
+      const ampCb = element("input", "");
+      ampCb.type = "checkbox";
+      ampCb.checked = amplifyDiff;
+      ampCb.addEventListener("change", () => { amplifyDiff = ampCb.checked; renderStage(); });
+
+      const polSel = element("select", UI.select);
+      polSel.append(
+        new Option("Política visual normalizada (EXIF + ICC→sRGB)", "normalized"),
+        new Option("Muestras decodificadas (sin rotación/ICC)", "raw"));
+      polSel.value = diffPolicy;
+      polSel.addEventListener("change", () => { diffPolicy = polSel.value; renderStage(); });
+
+      const diffUrl = sessionPath(sessionId) + "/duel/diff-map?" + new URLSearchParams({
+        file_a: idA, file_b: idB, mode: diffPolicy, amplify: String(amplifyDiff),
+      });
+      const diffImg = makeImg(diffUrl, "Mapa de diferencias de píxeles");
+      const diffNote = element("p", UI.smallMuted,
+        (amplifyDiff ? "Amplificación visual activa (diferencias sutiles resaltadas en magenta). " : "Sin amplificación visual. ")
+        + "Píxeles diferentes (normalizada): " + numbers.format(ic.visual_normalized?.different_pixels ?? 0) + ".");
+      stage.replaceChildren(
+        element("div", "flex flex-wrap items-center gap-3 mb-2",
+          polSel, element("label", UI.check, ampCb, "Amplificar diferencias pequeñas")),
+        diffNote,
+        element("div", "overflow-auto max-h-[440px] border border-line rounded-md bg-surface", diffImg));
+    }
+  };
+
+  renderStage();
+  wrap.append(modeBar, stage);
+  return wrap;
+}
+
+function imageComparisonSection(result) {
+  const ic = result.image_comparison;
+  if (!ic) return null;
+  const box = element("section", UI.duelSection);
+  box.append(element("div", UI.duelHead,
+    element("h2", UI.h2, "B. Análisis profundo de imágenes"),
+    element("span", UI.smallMuted + " font-mono", "Motor de imagen v" + (ic.engine_version || "1.0"))));
+
+  if (ic.status !== "analyzed" && ic.status !== "partial") {
+    box.append(element("p", UI.notice, ic.reason || "No se pudo completar el análisis de imágenes."));
+    return box;
+  }
+
+  // Interactive visual viewer (when temporary files are available)
+  const viewer = imageViewerWidget(result);
+  if (viewer) box.append(viewer);
+
+  // Two-level equivalence grid
+  const ds = ic.decoded_samples || {};
+  const vn = ic.visual_normalized || {};
+  const pc = ic.perceptual || {};
+
+  const makeBadge = (st) => {
+    const [txt, tone] = dimStatusLabels[st] || [st, ""];
+    const s = element("span", UI.status, txt);
+    if (tone) s.dataset.status = tone;
+    return s;
+  };
+
+  const dsCard = element("div", UI.cardRow,
+    element("div", UI.cardTop, element("strong", "", "1. Equivalencia de muestras decodificadas"), makeBadge(ds.status || "partial")),
+    element("p", UI.smallMuted, ds.reason || "—"));
+  if (typeof ds.different_pixels === "number") {
+    dsCard.append(element("p", UI.small + " font-mono",
+      "Píxeles distintos: " + numbers.format(ds.different_pixels) + " / " + numbers.format(ds.total_pixels)
+      + " (" + ds.different_percent + "%)"));
+  }
+
+  const vnCard = element("div", UI.cardRow,
+    element("div", UI.cardTop, element("strong", "", "2. Equivalencia visual normalizada"), makeBadge(vn.status || "partial")),
+    element("p", UI.smallMuted, vn.reason || "—"));
+  if (typeof vn.different_pixels === "number") {
+    const chTxt = vn.max_channel_diff
+      ? " · Máx Δ canal: " + Object.entries(vn.max_channel_diff).map(([k, v]) => k + "=" + v).join(", ")
+      : "";
+    vnCard.append(element("p", UI.small + " font-mono",
+      "Píxeles distintos: " + numbers.format(vn.different_pixels) + " / " + numbers.format(vn.total_pixels)
+      + " (" + vn.different_percent + "%)" + chTxt));
+  }
+  if (vn.policy?.lossy_note) {
+    vnCard.append(element("p", UI.notice, vn.policy.lossy_note));
+  }
+
+  box.append(element("div", UI.compareGrid, dsCard, vnCard));
+
+  // Perceptual similarity card
+  const pcStats = element("div", UI.stats,
+    ...[
+      ["SSIM", typeof pc.ssim === "number" ? pc.ssim.toFixed(4) : "—"],
+      ["pHash (Hamming)", typeof pc.phash_distance === "number" ? pc.phash_distance + " / 64" : "—"],
+      ["dHash (Hamming)", typeof pc.dhash_distance === "number" ? pc.dhash_distance + " / 64" : "—"],
+      ["MAE", typeof pc.mae === "number" ? pc.mae.toFixed(3) : "—"],
+      ["MSE", typeof pc.mse === "number" ? pc.mse.toFixed(3) : "—"],
+      ["PSNR", pc.psnr_infinite ? "∞ (idénticos)" : (typeof pc.psnr === "number" ? pc.psnr.toFixed(2) + " dB" : "—")],
+    ].map(([l, v]) => element("div", UI.stat, element("strong", "", v), element("span", "", l))));
+
+  const pcBox = element("div", UI.cardRow,
+    element("div", UI.cardTop,
+      element("strong", "", "3. Similitud perceptual — " + (pc.band || "Evaluada")),
+      makeBadge(pc.status || "partial")),
+    pcStats);
+  if (pc.methodology?.limitations?.length) {
+    pcBox.append(element("ul", UI.duelNotes + " text-[0.875rem] text-muted",
+      ...pc.methodology.limitations.map((l) => element("li", "", l))));
+  }
+  box.append(pcBox);
+
+  // Structural JPEG / PNG inspection
+  const st = ic.structural_comparison;
+  if (st) {
+    const stBox = element("div", UI.cardRow,
+      element("div", UI.cardTop,
+        element("strong", "", "4. Inspección estructural" + (st.format ? " (" + st.format + ")" : "")),
+        makeBadge(st.status || "not_applicable")));
+    if (st.reason) stBox.append(element("p", UI.smallMuted, st.reason));
+    if (st.differences?.length) {
+      stBox.append(element("ul", UI.duelNotes + " text-[0.875rem]",
+        ...st.differences.map((d) => element("li", "", element("strong", "", d.label + ": "), d.detail))));
+    } else if (st.identical_structure) {
+      stBox.append(element("p", UI.smallMuted, "Los segmentos/chunks estructurales coinciden por completo."));
+    }
+    for (const w of st.warnings || []) stBox.append(element("p", UI.notice, w));
+    box.append(stBox);
+  }
+
+  for (const n of ic.notes || []) box.append(element("p", UI.smallMuted, n));
+  return box;
+}
+
+function pdfDiffSection(content) {
+  const box = element("section", UI.duelSection);
+  const cs = content.summary;
+  box.append(
+    element("div", UI.duelHead,
+      element("h2", UI.h2, "B. Diferencias profundas de PDF"),
+      element("span", UI.smallMuted + " font-mono", "Motor documental v" + (content.engine_version || "1.0"))),
+    element("div", UI.stats,
+      ...[
+        ["Páginas A / B", cs.page_count_a + " / " + cs.page_count_b],
+        ["Idénticas", numbers.format(cs.identical_pages)],
+        ["Modificadas", numbers.format(cs.modified_pages)],
+        ["Reordenadas", numbers.format(cs.reordered_pages)],
+        ["Agregadas", numbers.format(cs.added_pages)],
+        ["Eliminadas", numbers.format(cs.removed_pages)],
+        ["Imágenes A / B", cs.images_a + " / " + cs.images_b],
+      ].map(([l, v]) => element("div", UI.stat, element("strong", "", String(v)), element("span", "", l)))));
+
+  for (const w of content.warnings || []) box.append(element("p", UI.notice, w));
+  if (content.structural_changes?.length) {
+    box.append(element("div", UI.callout,
+      element("strong", UI.small, "Cambios estructurales y de seguridad PDF"),
+      element("ul", UI.duelNotes + " text-[0.875rem]", ...content.structural_changes.map((c) => element("li", "", c)))));
+  }
+
+  const filter = element("select", UI.select);
+  filter.setAttribute("aria-label", "Filtrar páginas PDF");
+  filter.append(
+    new Option("Solo páginas con cambios", "changes"),
+    new Option("Todas las páginas (" + content.pages.length + ")", ""),
+  );
+  const hasDiff = content.pages.some((p) => p.status !== "identical");
+  filter.value = hasDiff ? "changes" : "";
+  const listHost = element("div", "grid grid-cols-[minmax(0,1fr)] gap-2");
+
+  const drawPages = () => {
+    const items = content.pages.filter((p) => !filter.value || p.status !== "identical");
+    if (!items.length) {
+      listHost.replaceChildren(element("p", UI.smallMuted, "No hay páginas con diferencias para este filtro."));
+      return;
+    }
+    listHost.replaceChildren(...items.slice(0, 50).map((p, idx) => {
+      const lbl = (p.page_a && p.page_b && p.page_a !== p.page_b)
+        ? "Página " + p.page_a + " → " + p.page_b
+        : p.page_a ? "Página " + p.page_a : "Página " + p.page_b + " (B)";
+      const badge = element("span", UI.status, slideStatusLabels[p.status] || p.status);
+      badge.dataset.status = p.status === "identical" ? "ok" : (p.status === "added" || p.status === "removed" ? "error" : "unsupported");
+      const body = element("div", UI.slideDiffBody);
+      if (p.changes?.length) body.append(element("p", UI.smallMuted, p.changes.join(" · ")));
+      if (p.text_a || p.text_b) {
+        body.append(element("div", "grid grid-cols-2 max-md:grid-cols-1 gap-2.5",
+          element("div", "py-[9px] px-[11px] border border-line rounded-md bg-wash", element("strong", UI.smallMuted, "Archivo A"), element("p", UI.metaVal + " text-[0.875rem]", p.text_a || "—")),
+          element("div", "py-[9px] px-[11px] border border-line rounded-md bg-wash", element("strong", UI.smallMuted, "Archivo B"), element("p", UI.metaVal + " text-[0.875rem]", p.text_b || "—"))));
+        if (p.segments?.length) {
+          body.append(element("div", "py-[9px] px-[11px] border border-line rounded-md bg-surface",
+            element("span", UI.smallMuted, "Diferencia textual:"), renderDiffSegments(p.segments)));
+        }
+      }
+      const det = element("details", UI.details,
+        element("summary", "flex items-center justify-between flex-wrap gap-2 font-semibold", element("span", "", lbl), badge),
+        body);
+      det.open = p.status !== "identical" && idx < 4;
+      return det;
+    }));
+  };
+  filter.addEventListener("change", drawPages);
+  drawPages();
+  box.append(element("div", UI.duelFilters, filter), listHost);
+  return box;
+}
+
+function docxDiffSection(content) {
+  const box = element("section", UI.duelSection);
+  const cs = content.summary;
+  box.append(
+    element("div", UI.duelHead,
+      element("h2", UI.h2, "B. Diferencias profundas de DOCX"),
+      element("span", UI.smallMuted + " font-mono", "Motor documental v" + (content.engine_version || "1.0"))),
+    element("div", UI.stats,
+      ...[
+        ["Párrafos A / B", cs.paragraphs_a + " / " + cs.paragraphs_b],
+        ["Modificados", numbers.format(cs.modified_paragraphs)],
+        ["Agregados", numbers.format(cs.added_paragraphs)],
+        ["Eliminados", numbers.format(cs.removed_paragraphs)],
+        ["Solo formato", numbers.format(cs.formatting_only_paragraphs)],
+        ["Tablas mod.", numbers.format(cs.modified_tables)],
+      ].map(([l, v]) => element("div", UI.stat, element("strong", "", String(v)), element("span", "", l)))));
+
+  for (const w of content.warnings || []) box.append(element("p", UI.notice, w));
+  if (content.structural_changes?.length) {
+    box.append(element("div", UI.callout,
+      element("strong", UI.small, "Cambios estructurales y multiparte (OOXML)"),
+      element("ul", UI.duelNotes + " text-[0.875rem]", ...content.structural_changes.map((c) => element("li", "", c)))));
+  }
+
+  const filter = element("select", UI.select);
+  filter.setAttribute("aria-label", "Filtrar diferencias de párrafos DOCX");
+  filter.append(
+    new Option("Todas las diferencias (" + content.paragraph_diffs.length + ")", ""),
+    new Option("Modificados", "modified"),
+    new Option("Agregados", "added"),
+    new Option("Eliminados", "removed"),
+  );
+  const host = element("div", "grid grid-cols-[minmax(0,1fr)] gap-2");
+  const draw = () => {
+    const rows = content.paragraph_diffs.filter((p) => !filter.value || p.status === filter.value);
+    if (!rows.length) {
+      host.replaceChildren(element("p", UI.smallMuted, "No se detectaron diferencias de párrafos para este filtro."));
+      return;
+    }
+    host.replaceChildren(...rows.slice(0, 60).map((p) => {
+      const badge = element("span", UI.status, slideStatusLabels[p.status] || p.status);
+      badge.dataset.status = p.status === "modified" ? "unsupported" : "error";
+      const card = element("div", UI.cardRow,
+        element("div", UI.cardTop,
+          element("strong", UI.small, "Párrafo A:" + (p.index_a ?? "—") + " / B:" + (p.index_b ?? "—")), badge));
+      if (p.segments?.length) card.append(renderDiffSegments(p.segments));
+      else card.append(element("p", UI.metaVal + " text-[0.875rem]", p.text_b || p.text_a));
+      return card;
+    }));
+  };
+  filter.addEventListener("change", draw);
+  draw();
+  box.append(element("div", UI.duelFilters, filter), host);
+
+  if (content.table_diffs?.length) {
+    box.append(element("details", UI.details,
+      element("summary", UI.summary, "Cambios en tablas (" + content.table_diffs.length + ")"),
+      element("ul", UI.duelNotes + " text-[0.875rem]",
+        ...content.table_diffs.map((t) => element("li", "", element("strong", "", "Tabla " + t.table + " (" + t.status + "): "), t.changes.join(" · "))))));
+  }
+  return box;
+}
+
+const cellChangeLabels = {
+  value_modified: "Valor modificado",
+  formula_modified: "Fórmula modificada",
+  formula_and_value_modified: "Fórmula y valor",
+  cache_only_diff: "Solo caché distinta",
+  added: "Celda agregada",
+  removed: "Celda eliminada",
+  type_changed: "Tipo cambiado",
+};
+
+function spreadsheetDiffSection(content) {
+  const box = element("section", UI.duelSection);
+  const cs = content.summary;
+  box.append(
+    element("div", UI.duelHead,
+      element("h2", UI.h2, "B. Diferencias en hojas de cálculo (" + (content.cross_format ? content.format_a + " ↔ " + content.format_b : content.format) + ")"),
+      element("span", UI.smallMuted + " font-mono", "Motor documental v" + (content.engine_version || "1.0"))),
+    element("div", UI.stats,
+      ...[
+        ["Hojas A / B", cs.sheets_a + " / " + cs.sheets_b],
+        ["Celdas pobladas", numbers.format(cs.populated_cells_union)],
+        ["Celdas modificadas", numbers.format(cs.modified_cells)],
+        ["Fórmulas distintas", numbers.format(cs.formula_diffs)],
+        ["Solo caché", numbers.format(cs.cache_only_diffs)],
+      ].map(([l, v]) => element("div", UI.stat, element("strong", "", String(v)), element("span", "", l)))));
+
+  for (const w of content.warnings || []) box.append(element("p", UI.notice, w));
+  if (content.structural_changes?.length) {
+    box.append(element("div", UI.callout,
+      element("strong", UI.small, "Cambios estructurales del libro"),
+      element("ul", UI.duelNotes + " text-[0.875rem]", ...content.structural_changes.map((c) => element("li", "", c)))));
+  }
+
+  if (!content.sheets?.length) {
+    box.append(element("p", UI.smallMuted, "No hay hojas emparejadas para mostrar diferencias de celdas."));
+    return box;
+  }
+
+  const sheetSel = element("select", UI.select);
+  sheetSel.setAttribute("aria-label", "Seleccionar hoja");
+  content.sheets.forEach((sh, idx) => {
+    const lbl = sh.name_a === sh.name_b ? sh.name_a : (sh.name_a + " → " + sh.name_b);
+    sheetSel.append(new Option(lbl + " (" + numbers.format(sh.modified_cells) + " cambio(s))", String(idx)));
+  });
+
+  const tableHost = element("div", "grid gap-2");
+  let page = 0;
+
+  const drawSheet = () => {
+    const sh = content.sheets[Number(sheetSel.value)] || content.sheets[0];
+    const diffs = sh.diffs || [];
+    const nodes = [];
+    if (sh.structural_changes?.length) {
+      nodes.push(element("p", UI.smallMuted, "Estructura de hoja: " + sh.structural_changes.join(" · ")));
+    }
+    if (!diffs.length) {
+      nodes.push(element("p", UI.smallMuted, "Todas las celdas pobladas de esta hoja coinciden."));
+      tableHost.replaceChildren(...nodes);
+      return;
+    }
+    const pageSize = 50;
+    const pages = Math.max(1, Math.ceil(diffs.length / pageSize));
+    page = Math.min(page, pages - 1);
+    const slice = diffs.slice(page * pageSize, (page + 1) * pageSize);
+
+    const rows = slice.map((d) => element("tr", UI.tr,
+      element("td", UI.td + " font-mono font-semibold whitespace-nowrap", d.cell),
+      element("td", UI.td + " text-[0.85rem]", display(d.value_a)),
+      element("td", UI.td + " text-[0.85rem]", display(d.value_b)),
+      element("td", UI.td + " font-mono text-[0.8rem] text-muted", d.formula_a || "—"),
+      element("td", UI.td + " font-mono text-[0.8rem] text-muted", d.formula_b || "—"),
+      element("td", UI.tdStatus, element("span", UI.status, cellChangeLabels[d.change_type] || d.change_type))));
+
+    nodes.push(element("div", UI.scrollTable,
+      element("table", UI.table + " min-w-[760px]",
+        element("thead", "", element("tr", "",
+          element("th", UI.th, "Celda"), element("th", UI.th, "Valor A"),
+          element("th", UI.th, "Valor B"), element("th", UI.th, "Fórmula A"),
+          element("th", UI.th, "Fórmula B"), element("th", UI.th, "Tipo de cambio"))),
+        element("tbody", "", ...rows))));
+
+    if (pages > 1) {
+      nodes.push(element("div", "flex items-center justify-between gap-2",
+        element("span", UI.smallMuted, "Página " + (page + 1) + " de " + pages + " (" + diffs.length + " celdas)"),
+        element("div", "flex gap-2",
+          (() => { const p = button("Anterior", () => { page--; drawSheet(); }, "subtle small-btn"); p.disabled = page === 0; return p; })(),
+          (() => { const n = button("Siguiente", () => { page++; drawSheet(); }, "subtle small-btn"); n.disabled = page >= pages - 1; return n; })())));
+    }
+    tableHost.replaceChildren(...nodes);
+  };
+
+  sheetSel.addEventListener("change", () => { page = 0; drawSheet(); });
+  drawSheet();
+  box.append(element("div", UI.duelFilters, sheetSel), tableHost);
+  return box;
+}
+
+function documentDiffSection(content, similarity) {
+  if (!content) return null;
+  if (content.status !== "analyzed") {
+    return element("section", UI.duelSection,
+      element("h2", UI.h2, "B. Diferencias profundas de contenido"),
+      element("p", UI.notice, content.reason || "No se pudo completar el análisis documental."));
+  }
+  if (content.format === "PPTX") return deepDiffSection(content, similarity);
+  if (content.format === "PDF") return pdfDiffSection(content);
+  if (content.format === "DOCX") return docxDiffSection(content);
+  if (["XLS", "XLSX", "SPREADSHEET"].includes(content.format)) return spreadsheetDiffSection(content);
+  return null;
+}
+
 function renderDuel(result, url, presentation) {
   const body = $("duel-body");
   const filter = element("select", UI.select);
@@ -659,11 +1176,15 @@ function renderDuel(result, url, presentation) {
       link("Descargar comparación JSON", url + "&download=true", "button subtle"),
       link("Descargar informe HTML", url + "&download=true&format=html", "button subtle")),
   ];
-  const simCard = similaritySection(result.similarity);
+  const capsCard = capabilitiesSummarySection(result);
+  if (capsCard) blocks.push(capsCard);
+  const simCard = result.capabilities?.is_document_pair ? similaritySection(result.similarity) : null;
   if (simCard) blocks.push(simCard);
   const binCard = binaryIdentitySection(result.binary_identity, result);
   if (binCard) blocks.push(binCard);
-  const diffCard = deepDiffSection(result.content_comparison, result.similarity);
+  const imgCard = imageComparisonSection(result);
+  if (imgCard) blocks.push(imgCard);
+  const diffCard = result.capabilities?.is_document_pair ? documentDiffSection(result.content_comparison, result.similarity) : null;
   if (diffCard) blocks.push(diffCard);
   blocks.push(metadataSection);
 
@@ -672,14 +1193,315 @@ function renderDuel(result, url, presentation) {
   return swap;
 }
 
+const duelMatrixState = {
+  referenceId: "",
+  stateFilter: "",
+  formatFilter: "",
+  page: 0,
+  batchTimer: null,
+};
+
+const matrixStateLabels = {
+  identical: ["Idénticos", "ok"],
+  equivalent: ["Equivalentes", "ok"],
+  similar: ["Similares", "unsupported"],
+  different: ["Diferentes", "unsupported"],
+  pending: ["Pendientes", ""],
+  not_applicable: ["No aplicables", ""],
+  error: ["Error", "error"],
+};
+
+async function renderDuelMatrixView(host, sessionId) {
+  host.replaceChildren(element("p", UI.muted, "Calculando matriz universal de capacidades y agrupaciones…"));
+  try {
+    const params = new URLSearchParams();
+    if (duelMatrixState.referenceId) params.set("reference_id", duelMatrixState.referenceId);
+    const qs = params.toString() ? "?" + params.toString() : "";
+    const data = await api(sessionPath(sessionId) + "/duel/matrix" + qs);
+    const nameById = new Map(data.inventory.map((it) => [it.id, it.name]));
+    const fmtById = new Map(data.inventory.map((it) => [it.id, it.format || "Sin confirmar"]));
+
+    const panel = element("section", UI.labPanel);
+    const exportJsonUrl = sessionPath(sessionId) + "/duel/matrix?download=true&format=json"
+      + (duelMatrixState.referenceId ? "&reference_id=" + encodeURIComponent(duelMatrixState.referenceId) : "");
+    const exportHtmlUrl = sessionPath(sessionId) + "/duel/matrix?download=true&format=html"
+      + (duelMatrixState.referenceId ? "&reference_id=" + encodeURIComponent(duelMatrixState.referenceId) : "");
+
+    panel.append(
+      element("div", UI.duelHead,
+        element("div", "",
+          element("h2", UI.h2, "Conjunto de " + numbers.format(data.file_count) + " archivos"),
+          element("p", UI.smallMuted, data.methodology.strategy)),
+        element("div", "flex flex-wrap gap-2",
+          link("Exportar JSON", exportJsonUrl, "button subtle small-btn"),
+          link("Exportar HTML", exportHtmlUrl, "button subtle small-btn"))));
+
+    // Summary stats
+    panel.append(element("div", UI.stats,
+      ...[
+        ["Archivos", data.file_count],
+        ["Parejas", data.counts.total_pairs],
+        ["Idénticas", data.counts.identical],
+        ["Equivalentes", data.counts.equivalent],
+        ["Similares", data.counts.similar],
+        ["Pendientes", data.counts.pending],
+        ["No aplicables", data.counts.not_applicable],
+        ["Errores", data.counts.error],
+      ].map(([l, v]) => element("div", UI.stat, element("strong", "", numbers.format(v)), element("span", "", l)))));
+
+    // Groups summary (binary duplicates, equivalent content, non-transitive perceptual candidates)
+    const groupsBox = element("div", "grid grid-cols-3 max-[1100px]:grid-cols-1 gap-3");
+    const dupCard = element("div", UI.cardRow,
+      element("strong", UI.small, "Duplicados binarios (" + data.groups.binary_duplicates.length + ")"),
+      data.groups.binary_duplicates.length
+        ? element("ul", UI.duelNotes + " text-[0.84rem] text-muted",
+            ...data.groups.binary_duplicates.map((g) => element("li", "", g.file_ids.map((id) => nameById.get(id)).join(" · "))))
+        : element("p", UI.smallMuted, "Ningún duplicado binario."));
+    const eqCard = element("div", UI.cardRow,
+      element("strong", UI.small, "Contenido visual equivalente (" + data.groups.equivalent_content.length + ")"),
+      data.groups.equivalent_content.length
+        ? element("ul", UI.duelNotes + " text-[0.84rem] text-muted",
+            ...data.groups.equivalent_content.map((g) => element("li", "", g.file_ids.map((id) => nameById.get(id)).join(" · "))))
+        : element("p", UI.smallMuted, "Sin equivalencias con bytes distintos."));
+    const percCard = element("div", UI.cardRow,
+      element("strong", UI.small, "Candidatos perceptuales (" + data.groups.perceptual_candidates.length + ")"),
+      data.groups.perceptual_candidates.length
+        ? element("ul", UI.duelNotes + " text-[0.84rem] text-muted",
+            ...data.groups.perceptual_candidates.slice(0, 6).map((p) => element("li", "",
+              nameById.get(p.file_a_id) + " ↔ " + nameById.get(p.file_b_id) + " (pH " + p.phash_distance + ", dH " + p.dhash_distance + ")")))
+        : element("p", UI.smallMuted, "Sin candidatos perceptuales adicionales."),
+      element("p", "text-[0.78rem] text-muted", data.groups.non_transitivity_note));
+    groupsBox.append(dupCard, eqCard, percCard);
+    panel.append(groupsBox);
+
+    // Controls: Reference mode, State filter, Format filter, Batch deep analysis + Cancel
+    const refSel = element("select", UI.select);
+    refSel.setAttribute("aria-label", "Modo de comparación contra referencia");
+    refSel.append(new Option("Matriz completa (todos contra todos)", ""),
+      ...data.inventory.map((it) => new Option("Referencia: " + it.name, it.id)));
+    refSel.value = duelMatrixState.referenceId;
+    refSel.addEventListener("change", () => {
+      duelMatrixState.referenceId = refSel.value;
+      duelMatrixState.page = 0;
+      renderDuelMatrixView(host, sessionId);
+    });
+
+    const stateSel = element("select", UI.select);
+    stateSel.setAttribute("aria-label", "Filtrar por estado de pareja");
+    stateSel.append(new Option("Todos los estados", ""),
+      ...Object.entries(matrixStateLabels).map(([k, [lbl]]) => new Option(lbl + " (" + data.counts[k] + ")", k)));
+    stateSel.value = duelMatrixState.stateFilter;
+
+    const fmtSel = element("select", UI.select);
+    fmtSel.setAttribute("aria-label", "Filtrar por formato");
+    fmtSel.append(new Option("Todos los formatos", ""),
+      ...Object.keys(data.format_counts).map((f) => new Option(f + " (" + data.format_counts[f] + ")", f)));
+    fmtSel.value = duelMatrixState.formatFilter;
+
+    const batchStatusBox = element("div", UI.cardRow);
+    batchStatusBox.hidden = true;
+    const batchCancelBtn = button("Cancelar lote", async () => {
+      await api(sessionPath(sessionId) + "/duel/matrix/cancel", {method: "POST"});
+    }, "subtle small-btn");
+
+    const pollBatch = async () => {
+      const st = await api(sessionPath(sessionId) + "/duel/matrix/status");
+      if (st.state === "running") {
+        batchStatusBox.hidden = false;
+        const bar = element("progress", "block w-full my-1");
+        bar.max = Math.max(1, st.total);
+        bar.value = st.processed;
+        batchStatusBox.replaceChildren(
+          element("div", UI.cardTop,
+            element("strong", UI.small, "Evaluando parejas: " + st.processed + " / " + st.total),
+            batchCancelBtn),
+          bar,
+          element("p", UI.smallMuted, st.current || "Procesando…"));
+        duelMatrixState.batchTimer = setTimeout(pollBatch, 350);
+      } else {
+        clearTimeout(duelMatrixState.batchTimer);
+        renderDuelMatrixView(host, sessionId);
+      }
+    };
+
+    const pendingTotal = data.counts.pending + data.counts.similar;
+    const batchBtn = button("Evaluar lote profundo (hasta 10)", async () => {
+      batchBtn.disabled = true;
+      await api(sessionPath(sessionId) + "/duel/matrix/batch", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({max_pairs: 10, reference_id: duelMatrixState.referenceId || null}),
+      });
+      pollBatch();
+    }, "accent-button");
+    batchBtn.disabled = pendingTotal === 0;
+
+    panel.append(element("div", UI.duelFilters, refSel, stateSel, fmtSel, batchBtn), batchStatusBox);
+
+    // Filtered & paginated pairs table (scalable for large N)
+    const tableHost = element("div", "grid gap-2");
+    const drawCells = () => {
+      const filtered = data.cells.filter((c) => {
+        if (duelMatrixState.stateFilter && c.state !== duelMatrixState.stateFilter) return false;
+        if (duelMatrixState.formatFilter) {
+          const fa = fmtById.get(c.file_a_id);
+          const fb = fmtById.get(c.file_b_id);
+          if (fa !== duelMatrixState.formatFilter && fb !== duelMatrixState.formatFilter) return false;
+        }
+        return true;
+      });
+      const pageSize = 25;
+      const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
+      duelMatrixState.page = Math.min(duelMatrixState.page, pages - 1);
+      const slice = filtered.slice(duelMatrixState.page * pageSize, (duelMatrixState.page + 1) * pageSize);
+
+      if (!slice.length) {
+        tableHost.replaceChildren(element("p", UI.tableEmpty, "Ninguna pareja coincide con los filtros seleccionados."));
+        return;
+      }
+
+      const rows = slice.map((c) => {
+        const [, tone] = matrixStateLabels[c.state] || [c.state, ""];
+        const b = element("span", UI.status, c.label);
+        if (tone) b.dataset.status = tone;
+        const openBtn = button("Abrir Duelo A/B", () => enterWorkbench("duel", [sessionId, c.file_a_id, c.file_b_id]), "subtle small-btn");
+        return element("tr", UI.tr,
+          element("td", UI.tdName, element("span", UI.truncate, nameById.get(c.file_a_id))),
+          element("td", UI.tdName, element("span", UI.truncate, nameById.get(c.file_b_id))),
+          element("td", UI.tdStatus, b),
+          element("td", UI.td + " text-[0.84rem] text-muted", c.detail),
+          element("td", UI.tdActions, openBtn));
+      });
+
+      const nodes = [
+        element("div", UI.scrollTable,
+          element("table", UI.table + " min-w-[760px]",
+            element("thead", "", element("tr", "",
+              element("th", UI.th, "Archivo A"), element("th", UI.th, "Archivo B"),
+              element("th", UI.th, "Resultado"), element("th", UI.th, "Detalle"),
+              element("th", UI.th, "Acción"))),
+            element("tbody", "", ...rows))),
+      ];
+      if (pages > 1) {
+        nodes.push(element("div", "flex items-center justify-between gap-2",
+          element("span", UI.smallMuted, "Página " + (duelMatrixState.page + 1) + " de " + pages + " (" + filtered.length + " parejas)"),
+          element("div", "flex gap-2",
+            (() => {
+              const prev = button("Anterior", () => { duelMatrixState.page--; drawCells(); }, "subtle small-btn");
+              prev.disabled = duelMatrixState.page === 0;
+              return prev;
+            })(),
+            (() => {
+              const next = button("Siguiente", () => { duelMatrixState.page++; drawCells(); }, "subtle small-btn");
+              next.disabled = duelMatrixState.page >= pages - 1;
+              return next;
+            })())));
+      }
+      tableHost.replaceChildren(...nodes);
+    };
+
+    stateSel.addEventListener("change", () => { duelMatrixState.stateFilter = stateSel.value; duelMatrixState.page = 0; drawCells(); });
+    fmtSel.addEventListener("change", () => { duelMatrixState.formatFilter = fmtSel.value; duelMatrixState.page = 0; drawCells(); });
+    drawCells();
+    panel.append(tableHost);
+
+    host.replaceChildren(panel);
+  } catch (err) {
+    host.replaceChildren(element("p", UI.notice, err.message));
+  }
+}
+
 function renderDuelHub() {
   const body = $("duel-body");
-  const panel = element("section", UI.labPanel);
-  panel.append(
-    element("h2", UI.h2, "Iniciar un duelo de documentos"),
-    element("p", UI.smallMuted, "Compara identidad binaria, contenido profundo (PPTX) y metadatos de dos archivos."));
+  const blocks = [];
 
+  // 1. Direct upload panel inside Duelo (2 or more files -> automatic routing)
+  const uploadPanel = element("section", UI.labPanel);
+  const picker = element("input", "");
+  picker.type = "file";
+  picker.multiple = true;
+  picker.hidden = true;
+  picker.setAttribute("aria-label", "Seleccionar dos o más archivos para Duelo");
+
+  const statusMsg = element("div", UI.notice);
+  statusMsg.hidden = true;
+  statusMsg.setAttribute("role", "status");
+
+  const runDirectDuelUpload = async (fileList) => {
+    const arr = Array.from(fileList);
+    if (arr.length < 2) {
+      statusMsg.hidden = false;
+      statusMsg.dataset.error = "true";
+      statusMsg.textContent = "Selecciona al menos 2 archivos para iniciar un Duelo.";
+      return;
+    }
+    statusMsg.hidden = false;
+    statusMsg.dataset.error = "false";
+    statusMsg.textContent = "Analizando " + arr.length + " archivo(s) localmente…";
+    try {
+      const form = new FormData();
+      for (const f of arr) form.append("files", f);
+      form.set("keep", "0");
+      const {id} = await api("/api/sessions", {method: "POST", body: form});
+      let next;
+      while (true) {
+        next = await api(sessionPath(id));
+        if (next.state === "complete") break;
+        if (next.state === "failed") throw new Error(next.error);
+        statusMsg.textContent = "Procesando " + next.processed + " / " + next.total + " · " + (next.current || "");
+        await new Promise((r) => setTimeout(r, 350));
+      }
+      renderResults(next);
+      if (next.files.length === 2) {
+        enterWorkbench("duel", [next.id, next.files[0].id, next.files[1].id]);
+      } else {
+        renderDuelHub();
+      }
+    } catch (err) {
+      statusMsg.hidden = false;
+      statusMsg.dataset.error = "true";
+      statusMsg.textContent = err.message;
+    }
+  };
+
+  const dropZone = element("div",
+    "min-h-[132px] grid grid-cols-[minmax(0,1fr)] content-center justify-items-center gap-1.5 p-4 border border-dashed border-line-strong rounded-[7px] text-center bg-wash [&.dragging]:border-2 [&.dragging]:border-accent [&.dragging]:bg-tint",
+    element("p", "font-semibold", "Arrastra 2 o más archivos aquí para comparar automáticamente"),
+    element("p", UI.smallMuted, "Imágenes JPEG/PNG/WebP, presentaciones PPTX, PDF, Office o formatos mixtos."),
+    button("Seleccionar archivos para Duelo", () => picker.click(), "primary"));
+
+  picker.addEventListener("change", () => {
+    if (picker.files.length) runDirectDuelUpload(picker.files);
+    picker.value = "";
+  });
+  for (const ev of ["dragenter", "dragover", "dragleave", "drop"]) {
+    dropZone.addEventListener(ev, (e) => {
+      if (!e.dataTransfer.types.includes("Files")) return;
+      e.preventDefault();
+      const leaving = ev === "dragleave" && !dropZone.contains(e.relatedTarget);
+      if (ev === "drop" || leaving) dropZone.classList.remove("dragging");
+      else dropZone.classList.add("dragging");
+      if (ev === "drop") runDirectDuelUpload(e.dataTransfer.files);
+    });
+  }
+
+  uploadPanel.append(
+    element("h2", UI.h2, "Duelo universal"),
+    element("p", UI.smallMuted, "Con 2 archivos se abre directamente la comparación A/B; con 3 o más se genera la matriz de conjunto, grupos y modo referencia."),
+    dropZone, picker, statusMsg);
+  blocks.push(uploadPanel);
+
+  // 2. Active session quick pair selector OR automatic N-file matrix when >= 3 files
   if (state.session && state.session.files.length >= 2) {
+    if (state.session.files.length >= 3) {
+      const matrixHost = element("div", "");
+      blocks.push(matrixHost);
+      body.replaceChildren(...blocks);
+      renderDuelMatrixView(matrixHost, state.session.id);
+      return;
+    }
+
+    const panel = element("section", UI.labPanel);
     const selA = element("select", UI.select);
     const selB = element("select", UI.select);
     selA.setAttribute("aria-label", "Archivo A");
@@ -700,19 +1522,15 @@ function renderDuelHub() {
       enterWorkbench("duel", [state.session.id, selA.value, selB.value]);
     }, "primary");
     panel.append(
+      element("h2", UI.h2, "Sesión actual (" + state.session.files.length + " archivos)"),
       element("div", UI.compareGrid,
-        element("label", UI.fieldGroup, element("span", UI.smallMuted, "Archivo A (sesión actual)"), selA),
-        element("label", UI.fieldGroup, element("span", UI.smallMuted, "Archivo B (sesión actual)"), selB)),
+        element("label", UI.fieldGroup, element("span", UI.smallMuted, "Archivo A"), selA),
+        element("label", UI.fieldGroup, element("span", UI.smallMuted, "Archivo B"), selB)),
       err,
       element("div", "flex flex-wrap gap-2", go, link("Ir a la tabla de archivos", "#workspace", "button subtle")));
-  } else {
-    panel.append(
-      element("p", UI.muted, "Carga al menos dos archivos en el Analizador para compararlos en un duelo, o abre una sesión guardada en Historial."),
-      element("div", "flex flex-wrap gap-2",
-        link("Ir al Analizador", "#workspace", "button primary"),
-        link("Abrir Historial", "#history", "button subtle")));
+    blocks.push(panel);
   }
-  body.replaceChildren(panel);
+  body.replaceChildren(...blocks);
 }
 
 async function loadDuel(sessionId, first, second, route, presentation) {

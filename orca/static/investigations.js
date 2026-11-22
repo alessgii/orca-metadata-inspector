@@ -921,11 +921,13 @@ function renderEmbeddedComparison(host, comp, inv, onClose) {
       element("p", UI.smallMuted, "UUID comparación: " + comp.uuid.slice(0, 8) + "… · " + timestamp(comp.created_at) + " · Algoritmos: " + comp.algorithms.join(", "))),
     button("Cerrar duelo", onClose, "subtle"));
   box.append(head);
-  const sim = similaritySection(result.similarity);
+  const sim = result.capabilities?.is_document_pair ? similaritySection(result.similarity) : null;
   if (sim) box.append(sim);
   const bin = binaryIdentitySection(result.binary_identity, result);
   if (bin) box.append(bin);
-  const diff = deepDiffSection(result.content_comparison, result.similarity);
+  const img = imageComparisonSection(result);
+  if (img) box.append(img);
+  const diff = result.capabilities?.is_document_pair ? documentDiffSection(result.content_comparison, result.similarity) : null;
   if (diff) box.append(diff);
 
   const techCheck = element("input", "");

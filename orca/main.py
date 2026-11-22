@@ -23,9 +23,11 @@ from starlette.templating import Jinja2Templates
 from .cleanup import POLICIES
 from .config import CHUNK, MAX_BYTES, MAX_FILES, ROOT, Settings
 from .duel import compare_files
+from .duel_engine import DuelBatchJob, IMAGE_FORMATS, build_duel_matrix
 from .evidence import format_evidence
 from .exposure import analyze_exposure
 from .extraction import ExifTool
+from .image_analysis import ImageSafetyError, generate_diff_map_png
 from .hashes import (
     AUTHENTICITY_NOTE,
     DEFAULT_ALGORITHM,
@@ -148,6 +150,11 @@ class InvestigationNoteUpdateRequest(BaseModel):
 class InvestigationMatrixBatchRequest(BaseModel):
     max_pairs: int = 10
     actor: str | None = None
+
+
+class DuelMatrixBatchRequest(BaseModel):
+    max_pairs: int = Field(default=10, ge=1, le=200)
+    reference_id: str | None = None
 
 
 def attachment(name):
@@ -363,6 +370,191 @@ def create_app(settings: Settings | None = None, extractor=None):
         except (IndexError, KeyError) as exc:
             raise HTTPException(404, "La evidencia indicada no existe en este archivo.") from exc
 
+    @app.get("/api/sessions/{session_id}/files/{file_id}/preview")
+    async def file_preview(request: Request, session_id: StoredId, file_id: StoredId):
+        service = request.app.state.service
+        with service.guard:
+            record, = service.records(session_id, file_id)
+        fmt = record.get("format")
+        media_map = {"JPEG": "image/jpeg", "PNG": "image/png", "WEBP": "image/webp"}
+        if fmt not in media_map:
+            raise HTTPException(415, "La previsualización directa solo está disponible para imágenes JPEG, PNG y WebP.")
+
+        def read_preview():
+            with service.pin_sources(session_id, (file_id,)) as paths:
+                src = paths.get(file_id)
+                if not src or not src.is_file():
+                    raise HTTPException(410, "El archivo temporal ya no está disponible para previsualización.")
+                return src.read_bytes()
+
+        data = await to_thread.run_sync(read_preview)
+        return Response(content=data, media_type=media_map[fmt])
+
+    @app.get("/api/sessions/{session_id}/duel/diff-map")
+    async def duel_diff_map(
+        request: Request,
+        session_id: StoredId,
+        file_a: CompareId,
+        file_b: CompareId,
+        mode: Literal["normalized", "raw"] = "normalized",
+        amplify: bool = True,
+    ):
+        if file_a == file_b:
+            raise HTTPException(422, "Selecciona dos archivos distintos.")
+        service = request.app.state.service
+        with service.guard:
+            first, = service.records(session_id, file_a)
+            second, = service.records(session_id, file_b)
+        if first.get("format") not in IMAGE_FORMATS or second.get("format") not in IMAGE_FORMATS:
+            raise HTTPException(422, "El mapa de diferencias requiere dos imágenes compatibles (JPEG, PNG o WebP).")
+
+        def build_map():
+            with service.pin_sources(session_id, (file_a, file_b)) as paths:
+                pa, pb = paths.get(file_a), paths.get(file_b)
+                if not pa or not pb:
+                    raise HTTPException(410, "Los archivos temporales ya no están disponibles para generar el mapa de diferencias.")
+                try:
+                    return generate_diff_map_png(pa, pb, mode=mode, amplify=amplify)
+                except ImageSafetyError as exc:
+                    raise HTTPException(422, str(exc)) from exc
+
+        png_bytes, meta = await to_thread.run_sync(build_map)
+        return Response(
+            content=png_bytes,
+            media_type="image/png",
+            headers={
+                "X-Orca-Diff-Pixels": str(meta["different_pixels"]),
+                "X-Orca-Total-Pixels": str(meta["total_pixels"]),
+                "X-Orca-Diff-Amplified": "true" if meta["amplified"] else "false",
+            },
+        )
+
+    @app.get("/api/sessions/{session_id}/duel/matrix")
+    async def duel_matrix(
+        request: Request,
+        session_id: StoredId,
+        reference_id: str | None = Query(default=None, pattern=r"^[a-f0-9]{32}$"),
+        download: bool = False,
+        format: Literal["json", "html"] = "json",
+    ):
+        service = request.app.state.service
+        with service.guard:
+            records = service.records(session_id)
+            job = service.active.get(session_id)
+            image_profiles = job.image_profiles if job else {}
+            duel_cache = job.duel_cache if job else {}
+            batch_status = job.duel_batch.snapshot() if (job and job.duel_batch) else None
+
+        def run_matrix():
+            fids = [r["id"] for r in records]
+            with service.pin_sources(session_id, fids) as paths:
+                return build_duel_matrix(
+                    records, paths, image_profiles, duel_cache, reference_id=reference_id
+                )
+
+        matrix = await to_thread.run_sync(run_matrix)
+        result = {"schema_version": 2, "session_id": session_id, "batch": batch_status, **matrix}
+        if download:
+            headers = {"Content-Disposition": attachment(f"orca-duelo-matriz.{format}")}
+            if format == "html":
+                return TEMPLATES.TemplateResponse(
+                    request, "duel_matrix_report.html", {"result": result}, headers=headers
+                )
+            return JSONResponse(result, headers=headers)
+        return result
+
+    @app.post("/api/sessions/{session_id}/duel/matrix/batch", status_code=202)
+    async def duel_matrix_batch(
+        request: Request,
+        session_id: StoredId,
+        body: DuelMatrixBatchRequest,
+    ):
+        service = request.app.state.service
+        with service.guard:
+            job = service.active.get(session_id)
+            if not job or job.state != "complete":
+                raise HTTPException(410, "La sesión temporal no está disponible para análisis por lotes.")
+            if job.duel_batch and job.duel_batch.snapshot()["state"] == "running":
+                raise HTTPException(409, "Ya hay un análisis por lotes en curso para esta sesión.")
+            records = list(job.records)
+            image_profiles = job.image_profiles
+            duel_cache = job.duel_cache
+
+        def prepare_pending():
+            fids = [r["id"] for r in records]
+            with service.pin_sources(session_id, fids) as paths:
+                matrix = build_duel_matrix(
+                    records, paths, image_profiles, duel_cache, reference_id=body.reference_id
+                )
+            pending = [
+                (c["file_a_id"], c["file_b_id"])
+                for c in matrix["cells"]
+                if c["state"] in {"pending", "similar"} and not c["deep_evaluated"]
+            ][: body.max_pairs]
+            return pending
+
+        pending_pairs = await to_thread.run_sync(prepare_pending)
+        batch = DuelBatchJob(total=len(pending_pairs))
+        with service.guard:
+            job.duel_batch = batch
+
+        rec_by_id = {r["id"]: r for r in records}
+
+        def run_batch():
+            try:
+                for fa, fb in pending_pairs:
+                    if batch.cancel_event.is_set():
+                        with batch.lock:
+                            batch.state = "cancelled"
+                            batch.current = None
+                        return
+                    ra, rb = rec_by_id[fa], rec_by_id[fb]
+                    with batch.lock:
+                        batch.current = f"{ra['name']} ↔ {rb['name']}"
+                    with service.pin_sources(session_id, (fa, fb)) as paths:
+                        res = compare_files(
+                            ra, rb,
+                            path_a=paths.get(fa), path_b=paths.get(fb),
+                            settings=settings,
+                            profile_a=image_profiles.get(fa),
+                            profile_b=image_profiles.get(fb),
+                        )
+                    pair_key = (fa, fb) if fa < fb else (fb, fa)
+                    with service.guard:
+                        duel_cache[pair_key] = res
+                    with batch.lock:
+                        batch.processed += 1
+                with batch.lock:
+                    batch.state = "cancelled" if batch.cancel_event.is_set() else "complete"
+                    batch.current = None
+            except Exception as exc:
+                with batch.lock:
+                    batch.state = "failed"
+                    batch.error = str(exc)
+                    batch.current = None
+
+        request.app.state.executor.submit(run_batch)
+        return batch.snapshot()
+
+    @app.get("/api/sessions/{session_id}/duel/matrix/status")
+    def duel_matrix_status(request: Request, session_id: StoredId):
+        service = request.app.state.service
+        with service.guard:
+            job = service.active.get(session_id)
+            if not job or not job.duel_batch:
+                return {"state": "idle", "processed": 0, "total": 0, "current": None, "cancelled": False, "error": None}
+            return job.duel_batch.snapshot()
+
+    @app.post("/api/sessions/{session_id}/duel/matrix/cancel")
+    def duel_matrix_cancel(request: Request, session_id: StoredId):
+        service = request.app.state.service
+        with service.guard:
+            job = service.active.get(session_id)
+            if job and job.duel_batch:
+                job.duel_batch.cancel()
+                return job.duel_batch.snapshot()
+        return {"state": "idle", "processed": 0, "total": 0, "current": None, "cancelled": True, "error": None}
+
     @app.get("/api/sessions/{session_id}/duel")
     async def duel(request: Request, session_id: StoredId, file_a: CompareId, file_b: CompareId,
                    download: bool = False, format: Literal["json", "html"] = "json"):
@@ -372,15 +564,33 @@ def create_app(settings: Settings | None = None, extractor=None):
         with service.guard:
             first, = service.records(session_id, file_a)
             second, = service.records(session_id, file_b)
+            job = service.active.get(session_id)
+            image_profiles = job.image_profiles if job else {}
+            duel_cache = job.duel_cache if job else None
 
         def run_duel():
             with service.pin_sources(session_id, (file_a, file_b)) as paths:
-                return compare_files(
+                comp = compare_files(
                     first, second,
                     path_a=paths.get(file_a),
                     path_b=paths.get(file_b),
                     settings=settings,
+                    profile_a=image_profiles.get(file_a),
+                    profile_b=image_profiles.get(file_b),
                 )
+            # Reuse extracted image profiles & cache deep result in active session
+            ic = comp.get("image_comparison")
+            if job is not None and isinstance(ic, dict):
+                with service.guard:
+                    if ic.get("profile_a") and file_a not in image_profiles:
+                        image_profiles[file_a] = ic["profile_a"]
+                    if ic.get("profile_b") and file_b not in image_profiles:
+                        image_profiles[file_b] = ic["profile_b"]
+            if duel_cache is not None:
+                pair_key = (file_a, file_b) if file_a < file_b else (file_b, file_a)
+                with service.guard:
+                    duel_cache[pair_key] = comp
+            return comp
 
         comparison = await to_thread.run_sync(run_duel)
         result = {"schema_version": 2, "session_id": session_id, **comparison}

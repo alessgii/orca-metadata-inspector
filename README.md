@@ -1,59 +1,159 @@
-# Orca Metadata Inspector
+# La Orca — Inspector de metadatos
 
-Orca es una aplicación de escritorio web local para inspeccionar, comparar y reducir los metadatos de archivos propios. El servidor escucha en `127.0.0.1`. La interfaz, sus iconos y su CSS se sirven desde el mismo proceso. La instalación inicial descarga dependencias. El análisis, la limpieza y las exportaciones funcionan sin conexión.
+**La Orca** es una aplicación web de escritorio 100% local para inspeccionar metadatos, comparar archivos en profundidad (documentos e imágenes), calcular y verificar hashes criptográficos, generar manifiestos de integridad, limpiar metadatos con verificación posterior y gestionar expedientes de investigación portables.
 
-## Inicio en Linux
+- **Ejecución local y privada:** el servidor escucha únicamente en `127.0.0.1` sin servicios externos ni nube. La interfaz (Tailwind CSS 4), sus iconos SVG y sus scripts se sirven desde el mismo proceso.
+- **Sin conexión:** una vez instaladas las dependencias iniciales, todos los análisis, comparaciones, limpiezas y exportaciones operan offline.
+- **Formatos admitidos:** `PDF`, `DOCX`, `XLS`, `XLSX`, `PPTX`, `JPEG`, `PNG`, `WebP` y contenedores `ZIP` (validados por firma binaria real, nunca solo por extensión).
 
-Requisitos de ejecución: Python 3.12 o posterior, ExifTool y un navegador moderno. En un clon nuevo, abre una terminal en la carpeta del proyecto.
+## Qué hace La Orca (resumen de módulos)
+
+La barra lateral compacta expandible (estilo Supabase, con modo fijable y soporte de tema claro/oscuro) organiza la aplicación en siete secciones:
+
+1. **Analizador (`#workspace`):** carga de hasta 100 archivos o ZIP (hasta 100 MB por carga directa), extracción con ExifTool, detección de correlaciones entre archivos, ficha detallada con **Normalizados**, **Técnicos**, **Cronología (Máquina del tiempo)**, **Hallazgos**, **Exposición («¿Qué estoy filtrando?»)**, **Copiar como evidencia**, **JSON** y **Antes / Después (Limpieza verificada)** — incluyendo verificación visual automática de píxeles y estructura tras limpiar imágenes JPEG/PNG.
+2. **Duelo (`#duel`):** comparador universal automático para **2 o más archivos**. Detecta los formatos reales por firma binaria y activa únicamente los motores compatibles:
+   - **Identidad binaria:** SHA-256 y diferencia de tamaño (siempre activo).
+   - **Metadatos:** comparación semántica de roles, fechas UTC, coordenadas y etiquetas técnicas.
+   - **Imágenes (`JPEG`, `PNG`, `WebP`):** equivalencia de muestras decodificadas (incluido **PNG de 16 bits** sin truncamiento), equivalencia visual normalizada (orientación EXIF + ICC→sRGB + canal alfa RGBA), similitud perceptual (`SSIM`, `pHash`, `dHash`, `MAE`, `MSE`, `PSNR`), inspección estructural defensiva **JPEG** (segmentos APPn/DQT/DHT/SOF/SOS/post-EOI) y **PNG** (chunks IHDR/IDAT/CRC32/APNG), y visor interactivo (lado a lado sincronizado, alternancia A/B, deslizador, zoom y **mapa de diferencias** PNG).
+   - **Documentos (`PPTX`, `PDF`, `DOCX`, `XLS`, `XLSX` y cruzado `XLS ↔ XLSX`):** extracción de contenido real y comparación estructural/semántica (diapositivas y multimedia PPTX; páginas, texto, imágenes, anotaciones y detección sin ejecución de JavaScript en PDF; párrafos, tablas, encabezados/pies, notas, comentarios, enlaces e imágenes multiparte en DOCX; hojas, celdas pobladas, fórmulas vs valores en caché y hojas renombradas/agregadas en XLS/XLSX).
+   - **N archivos (3 o más):** estrategia escalonada, matriz interactiva paginada, **modo Referencia (1 vs N)**, duplicados binarios, contenido equivalente, candidatos perceptuales no transitivos, análisis profundo por lotes cancelable y exportación JSON/HTML.
+3. **Investigaciones (`#investigations`):** expedientes persistentes en SQLite identificados por **UUID v7**, con estados (`Abierta`, `Pausada`, `Cerrada`), auditoría de solo anexado, incorporación de archivos/carpetas (sin guardar originales), matriz de similitud, línea de tiempo documental, mapa de relaciones, observaciones versionadas y exportación/importación individual o masiva de paquetes `.zip` portables.
+4. **Laboratorio de hashes (`#hashes`):** calculadora en bloques de 128 kB (`MD5`, `SHA-1`, `SHA-256`, `SHA-512`), comparador en tiempo constante e historial en SQLite con función «Verificar nuevamente».
+5. **Historial (`#history`):** consulta y gestión de sesiones guardadas en `.orca-data/history.sqlite3`.
+6. **Manifiestos (`#manifests`):** generación y verificación de manifiestos de integridad JSON v1 para archivos o carpetas, con informe HTML/JSON.
+7. **Guía de uso (`#guide`):** referencia rápida de políticas de limpieza, similitud, hashes y retención.
+
+---
+
+## Instalación detallada en Linux
+
+### Requisitos previos
+- **Python 3.12 o posterior** (`python3 --version`) con `venv` y `pip`.
+- **ExifTool** (y los módulos Perl `Archive::Zip` y `Compress::Zlib` para inspección completa de Office/PDF).
+- **Navegador moderno** (Firefox, Chromium, Chrome, Edge, etc.).
+- *(Opcional, solo para desarrollo de estilos)* **Node.js 20+** para recompilar Tailwind CSS 4.
+
+### Paso 1: Clonar el repositorio y crear el entorno virtual
 
 ```bash
+git clone https://github.com/alessgii/orca-metadata-inspector.git
+cd orca-metadata-inspector
+
 python3 --version
 python3 -m venv .venv
+.venv/bin/python -m pip install --upgrade pip
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
-Para ExifTool, usa el paquete de tu distribución si puedes instalar paquetes del sistema.
+> En Debian/Ubuntu, si `python3 -m venv` indica que falta el módulo `ensurepip`, instala primero `sudo apt install python3-venv`.
+
+### Paso 2: Instalar ExifTool
+
+**Opción A — Paquetes del sistema (recomendada):**
 
 ```bash
-# Fedora
+# Fedora / RHEL
 sudo dnf install perl-Image-ExifTool perl-Archive-Zip perl-IO-Compress
 
-# Debian o Ubuntu
+# Debian / Ubuntu
+sudo apt update
 sudo apt install libimage-exiftool-perl libarchive-zip-perl
+
+# Arch Linux
+sudo pacman -S perl-image-exiftool perl-archive-zip
 ```
 
-Si trabajas sin privilegios, extrae la distribución Perl oficial en una carpeta local. Mantén juntos el ejecutable `exiftool` y su directorio `lib`. Indica la ruta al ejecutable desde la raíz de Orca. Si los módulos Perl ya están disponibles y la distribución 13.59 está en la ruta del ejemplo, puedes omitir la variable `ORCA_EXIFTOOL`.
+Verifica que ExifTool y los módulos Perl respondan correctamente:
+
+```bash
+exiftool -ver
+perl -MArchive::Zip -MCompress::Zlib -e 'print "Módulos Perl disponibles\n"'
+```
+
+**Opción B — Instalación local sin privilegios (`rootless`):**
+
+Descarga la distribución Perl oficial desde [exiftool.org/install.html](https://exiftool.org/install.html), extráela en `.tools/exiftool-13.59/` (conservando juntos el ejecutable `exiftool` y su carpeta `lib/`) y apunta `ORCA_EXIFTOOL`:
 
 ```bash
 export ORCA_EXIFTOOL="$PWD/.tools/exiftool-13.59/exiftool"
 "$ORCA_EXIFTOOL" -ver
-perl -MArchive::Zip -MCompress::Zlib -e 'print "Módulos Perl disponibles\n"'
+```
+
+*(Si extraes la versión `13.59` en `.tools/exiftool-13.59/exiftool`, La Orca la detecta automáticamente incluso sin definir `ORCA_EXIFTOOL`.)*
+
+### Paso 3: Iniciar La Orca en Linux
+
+```bash
 .venv/bin/python -m orca
 ```
 
-Si tu Perl es mínimo, instala sus módulos por los medios admitidos por la distribución o configura `PERL5LIB` con sus directorios locales. En el entorno de desarrollo Fedora 44, se usó ExifTool 13.59 extraído de su distribución oficial. Los RPM necesarios de Perl se descargaron y extrajeron con `rpm2cpio` y `cpio` bajo `.tools/perl`, sin instalarlos globalmente. Orca detecta esta distribución y esos módulos al encontrarla en `.tools/exiftool-13.59/exiftool` sin `ORCA_EXIFTOOL`.
+Abre en tu navegador: [http://127.0.0.1:8000/](http://127.0.0.1:8000/)
 
-Abre [Orca en 127.0.0.1:8000](http://127.0.0.1:8000/). Detén el servidor con Ctrl+C. Si el puerto está ocupado, usa `.venv/bin/python -m orca --port 8001` y abre el puerto correspondiente. [Instalación de ExifTool](https://exiftool.org/install.html).
+- Para detener el servidor: `Ctrl+C`.
+- Si el puerto `8000` está ocupado: `.venv/bin/python -m orca --port 8001` y abre `http://127.0.0.1:8001/`.
 
-## Inicio en Windows
+---
 
-En PowerShell, dentro de la carpeta del proyecto:
+## Instalación detallada en Windows
+
+### Requisitos previos
+- **Python 3.12 o posterior** instalado desde [python.org](https://www.python.org/downloads/windows/) (marca la opción **Add python.exe to PATH** durante la instalación).
+- **ExifTool para Windows** (ejecutable standalone oficial).
+- **PowerShell** (incluido en Windows 10/11) y un navegador moderno.
+
+### Paso 1: Clonar o descargar el proyecto y crear el entorno virtual
+
+Abre **PowerShell** en la carpeta del proyecto:
 
 ```powershell
+git clone https://github.com/alessgii/orca-metadata-inspector.git
+cd orca-metadata-inspector
+
 py -3 --version
 py -3 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-Descarga y extrae la versión ejecutable de ExifTool para Windows. Cambia el nombre de `exiftool(-k).exe` a `exiftool.exe`, conserva `exiftool_files` junto al ejecutable y ajusta la ruta de ejemplo.
+> Si PowerShell bloquea scripts de activación, no es necesario activar el entorno: todos los comandos anteriores invocan directamente `.\.venv\Scripts\python.exe`.
+
+### Paso 2: Instalar ExifTool en Windows
+
+**Opción A — Con `winget` (Windows 10/11):**
+
+```powershell
+winget install OliverBetz.ExifTool
+```
+
+Abre una nueva ventana de PowerShell y verifica:
+
+```powershell
+exiftool -ver
+```
+
+**Opción B — Instalación manual portable (sin permisos de administrador):**
+
+1. Descarga el archivo ZIP oficial de **Windows Executable** desde [exiftool.org](https://exiftool.org/).
+2. Extrae todo su contenido en una carpeta local, por ejemplo `.\.tools\exiftool\` dentro del proyecto.
+3. **Importante:** renombra `exiftool(-k).exe` a `exiftool.exe` y **mantén la carpeta `exiftool_files` en el mismo directorio** que `exiftool.exe`.
+4. Configura la variable de entorno en PowerShell antes de iniciar La Orca (o agrega esa carpeta a tu `PATH` de usuario):
 
 ```powershell
 $env:ORCA_EXIFTOOL = "$PWD\.tools\exiftool\exiftool.exe"
 & $env:ORCA_EXIFTOOL -ver
+```
+
+### Paso 3: Iniciar La Orca en Windows
+
+```powershell
 .\.venv\Scripts\python.exe -m orca
 ```
 
-Abre [Orca en 127.0.0.1:8000](http://127.0.0.1:8000/). También puedes dejar `exiftool.exe` en el `PATH`. [Distribución oficial y archivos auxiliares](https://exiftool.org/install.html).
+Abre en tu navegador: [http://127.0.0.1:8000/](http://127.0.0.1:8000/)
+
+- Para detener el servidor: `Ctrl+C`.
+- Para usar otro puerto: `.\.venv\Scripts\python.exe -m orca --port 8001`.
+- Si deseas que `ORCA_EXIFTOOL` persista entre sesiones de PowerShell, puedes añadir la carpeta de `exiftool.exe` a las *Variables de entorno del usuario → Path* en Windows.
 
 ## Uso
 
@@ -200,15 +300,16 @@ Orca lee variables del entorno del proceso. Usa `export ORCA_TTL=900` en Linux o
 | `orca/uploads.py` | Cuotas, firmas binarias, validación de ZIP y Open XML, preparación de archivos. |
 | `orca/extraction.py` | Protocolo `Extractor`, adaptador ExifTool, subprocess acotado y SHA-256. |
 | `orca/analysis.py`, `orca/metadata.py` | Inspección, orígenes de campos normalizados, hallazgos, comparaciones y correlaciones. |
-| `orca/timeline.py`, `orca/duel.py` | Interpretación de fechas y comparación en tres dimensiones (binaria, contenido y metadatos). |
-| `orca/content.py`, `orca/similarity.py` | Motor extensible de extracción/comparación profunda (PPTX) y puntuación determinista de similitud. |
+| `orca/timeline.py`, `orca/duel.py`, `orca/duel_engine.py` | Interpretación de fechas, orquestador universal por capacidades, matriz N archivos y lotes cancelables. |
+| `orca/content.py`, `orca/doc_analyzers.py`, `orca/xls_reader.py`, `orca/similarity.py` | Extracción y comparación profunda (PPTX, PDF, DOCX, XLS OLE2/BIFF8, XLSX y `XLS ↔ XLSX`) y similitud determinista. |
+| `orca/image_analysis.py` | Equivalencia de muestras (incluido PNG 16-bit), normalización EXIF/ICC/RGBA, similitud perceptual (`SSIM`, `pHash`, `dHash`, `MAE`, `MSE`, `PSNR`), parsers estructurales JPEG/PNG y mapas de diferencias. |
 | `orca/hashes.py`, `orca/manifests.py` | Cálculo de hashes en bloques, validación/comparación, esquema v1 y verificación de manifiestos. |
 | `orca/investigations.py`, `orca/portability.py` | Expedientes con UUIDv7, matriz de similitud, cronologías, grafo, notas versionadas y paquetes `.zip` portables. |
 | `orca/evidence.py`, `orca/exposure.py` | Evidencia contextual, reglas de exposición y diferencias tras limpiar. |
-| `orca/sessions.py`, `orca/storage.py` | Lotes, progreso, temporales y persistencia SQLite (`analysis`, `document` y `hash_record`). |
-| `orca/cleanup.py`, `orca/rewrite.py` | Políticas por formato, reescritura, reextracción y validación de copias. |
-| `orca/reports.py`, `orca/templates/` | Informes y HTML escapado (sesiones, duelos y verificación de manifiestos). |
-| `orca/static/`, `frontend/` | Interfaz en español, Fetch, JavaScript sin framework (`app.js`, `inspection.js`, `hash-lab.js`, `manifests.js`), SVG locales y Tailwind compilado. |
+| `orca/sessions.py`, `orca/storage.py` | Lotes, progreso, temporales, caché de perfiles y persistencia SQLite. |
+| `orca/cleanup.py`, `orca/rewrite.py` | Políticas por formato, reescritura, reextracción, validación de copias y verificación visual JPEG/PNG. |
+| `orca/reports.py`, `orca/templates/` | Informes y HTML escapado (sesiones, duelos A/B, matrices N archivos, investigaciones y manifiestos). |
+| `orca/static/`, `frontend/` | Interfaz en español, Fetch, JavaScript sin framework (`app.js`, `inspection.js`, `timeline-summary.js`, `hash-lab.js`, `manifests.js`, `investigations.js`), SVG locales y Tailwind CSS 4. |
 
 SQLite se usa mediante la biblioteca estándar para mantener la instalación ligera. El historial guarda metadatos agrupados tal como se entregan en el JSON de ExifTool. Se excluyen los campos del sistema de archivos que describirían el directorio y las marcas de tiempo temporales del servidor. Los archivos de entrada conservan su nombre y tamaño declarados en el registro de análisis, además del hash calculado cuando se leyó un archivo completo.
 
@@ -222,7 +323,11 @@ SQLite se usa mediante la biblioteca estándar para mantener la instalación lig
 | `GET /api/sessions/{id}/files/{file_id}` | JSON original, normalización con origen, hash y hallazgos. |
 | `GET /api/sessions/{id}/files/{file_id}/context` | Cronología, exposición y comparación de exposición si hay una copia vigente. |
 | `GET /api/sessions/{id}/files/{file_id}/evidence` | Evidencia. Usa `kind=raw&tag=...` o `kind=normalized`, `finding` o `exposure` con `index` desde cero en el orden del JSON. |
-| `GET /api/sessions/{id}/duel?file_a=…&file_b=…` | Comparación profunda en 3 dimensiones y similitud documental. Usa `download=true` para descargar JSON o añade `format=html` para el informe. |
+| `GET /api/sessions/{id}/files/{file_id}/preview` | Previsualización segura de imagen (`JPEG`, `PNG`, `WebP`) de una sesión temporal activa. |
+| `GET /api/sessions/{id}/duel?file_a=…&file_b=…` | Duelo universal por capacidades (binario, metadatos, imágenes y documentos). Admite `download=true` y `format=json\|html`. |
+| `GET /api/sessions/{id}/duel/diff-map?file_a=…&file_b=…` | Genera y devuelve un mapa PNG de diferencias exactas de píxeles (`mode=normalized\|raw`, `amplify=true\|false`). |
+| `GET /api/sessions/{id}/duel/matrix` | Matriz N archivos, duplicados, grupos y modo referencia (`reference_id`, `download=true`, `format=json\|html`). |
+| `POST /api/sessions/{id}/duel/matrix/batch`, `.../status`, `.../cancel` | Ejecuta, consulta progreso o cancela de forma segura comparaciones profundas por lotes. |
 | `POST /api/sessions/{id}/files/{file_id}/clean` | Reescribe y verifica una copia, devuelve la diferencia y el JSON posterior. |
 | `GET /api/sessions/{id}/files/{file_id}/copy` | Descarga la copia verificada vigente. |
 | `GET /api/sessions/{id}/export/{json\|csv\|html}` | Descarga el informe. |
